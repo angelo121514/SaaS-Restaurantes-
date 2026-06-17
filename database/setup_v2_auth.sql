@@ -54,13 +54,30 @@ LANGUAGE plpgsql
 SECURITY DEFINER SET search_path = public
 AS $$
 BEGIN
-  INSERT INTO public.profiles (id, role, display_name)
+  INSERT INTO public.profiles (id, role, restaurant_id, display_name)
   VALUES (
     NEW.id,
-    COALESCE(NEW.app_metadata->>'role', 'owner'),
-    COALESCE(NEW.raw_user_meta_data->>'full_name', split_part(NEW.email, '@', 1))
+    COALESCE(
+      NEW.raw_app_meta_data->>'role',
+      NEW.raw_user_meta_data->>'role',
+      'owner'
+    ),
+    COALESCE(
+      (NEW.raw_user_meta_data->>'restaurant_id')::uuid,
+      (NEW.raw_app_meta_data->>'restaurant_id')::uuid
+    ),
+    COALESCE(
+      NEW.raw_user_meta_data->>'full_name',
+      split_part(NEW.email, '@', 1)
+    )
   )
-  ON CONFLICT (id) DO NOTHING;
+  ON CONFLICT (id) DO UPDATE
+  SET 
+    role = EXCLUDED.role,
+    restaurant_id = EXCLUDED.restaurant_id,
+    display_name = EXCLUDED.display_name;
+  RETURN NEW;
+EXCEPTION WHEN OTHERS THEN
   RETURN NEW;
 END;
 $$;
@@ -247,6 +264,11 @@ BEGIN
   SET status = 'consumed', consumed_at = now()
   WHERE id = v_inv.id;
 
+  -- Link the profile to the restaurant immediately if the user already exists
+  UPDATE public.profiles
+  SET restaurant_id = v_inv.restaurant_id
+  WHERE id = (SELECT u.id FROM auth.users u WHERE u.email = v_inv.email);
+
   RETURN QUERY SELECT v_inv.restaurant_id, v_inv.email, TRUE;
 END;
 $$;
@@ -285,6 +307,48 @@ CREATE POLICY restaurants_owner_select ON public.restaurants
   );
 CREATE POLICY restaurants_owner_update ON public.restaurants
   FOR UPDATE USING (public.is_my_restaurant(id));
+
+-- REGISTRATION REQUESTS: público inserta, admin lee/escribe
+DROP POLICY IF EXISTS "Public can insert registration requests" ON public.registration_requests;
+DROP POLICY IF EXISTS "Admins can select all registration requests" ON public.registration_requests;
+DROP POLICY IF EXISTS "Admins can update all registration requests" ON public.registration_requests;
+
+CREATE POLICY "Public can insert registration requests" ON public.registration_requests
+  FOR INSERT WITH CHECK (true);
+CREATE POLICY "Admins can select all registration requests" ON public.registration_requests
+  FOR SELECT USING (public.is_admin());
+CREATE POLICY "Admins can update all registration requests" ON public.registration_requests
+  FOR UPDATE USING (public.is_admin()) WITH CHECK (public.is_admin());
+
+-- MENU ITEMS: público lee activos, owner/admin todo
+DROP POLICY IF EXISTS "Restaurant owners can manage menu" ON public.menu_items;
+DROP POLICY IF EXISTS "Public can view available menu items" ON public.menu_items;
+DROP POLICY IF EXISTS "Restaurant owners and admins can manage menu items" ON public.menu_items;
+
+CREATE POLICY "Public can view available menu items" ON public.menu_items
+  FOR SELECT USING (is_available = true);
+CREATE POLICY "Restaurant owners and admins can manage menu items" ON public.menu_items
+  FOR ALL USING (public.is_my_restaurant(restaurant_id)) WITH CHECK (public.is_my_restaurant(restaurant_id));
+
+-- MENU CATEGORIES: público lee, owner/admin todo
+DROP POLICY IF EXISTS "Restaurant owners can manage categories" ON public.menu_categories;
+DROP POLICY IF EXISTS "Public can view categories" ON public.menu_categories;
+DROP POLICY IF EXISTS "Restaurant owners and admins can manage menu categories" ON public.menu_categories;
+
+CREATE POLICY "Public can view categories" ON public.menu_categories
+  FOR SELECT USING (is_active = true);
+CREATE POLICY "Restaurant owners and admins can manage menu categories" ON public.menu_categories
+  FOR ALL USING (public.is_my_restaurant(restaurant_id)) WITH CHECK (public.is_my_restaurant(restaurant_id));
+
+-- ORDERS: público inserta, owner/admin todo
+DROP POLICY IF EXISTS "Restaurant owners can manage orders" ON public.orders;
+DROP POLICY IF EXISTS "Public can create orders" ON public.orders;
+DROP POLICY IF EXISTS "Restaurant owners and admins can manage orders" ON public.orders;
+
+CREATE POLICY "Public can create orders" ON public.orders
+  FOR INSERT WITH CHECK (true);
+CREATE POLICY "Restaurant owners and admins can manage orders" ON public.orders
+  FOR ALL USING (public.is_my_restaurant(restaurant_id)) WITH CHECK (public.is_my_restaurant(restaurant_id));
 
 -- ---------------------------------------------------------------------
 -- 7. Permisos de ejecución

@@ -104,8 +104,7 @@ const RegisterPage: React.FC = () => {
             notes: formData.notes.trim() || null,
             status: "pending",
           },
-        ])
-        .select();
+        ]);
 
       if (insertError) {
         throw insertError;

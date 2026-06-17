@@ -41,6 +41,11 @@ const LoginPage: React.FC = () => {
           return;
         }
 
+        if (profile.role === "admin") {
+          navigate("/admin");
+          return;
+        }
+
         if (profile.restaurant_id) {
           const { data: rest } = await supabase
             .from("restaurants")
@@ -149,6 +154,11 @@ const LoginPage: React.FC = () => {
           .select("restaurant_id, role")
           .eq("id", data.user.id)
           .single();
+
+        if (profile?.role === "admin") {
+          navigate("/admin");
+          return;
+        }
 
         if (profile?.restaurant_id) {
           const { data: rest } = await supabase

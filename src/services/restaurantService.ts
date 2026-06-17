@@ -154,9 +154,7 @@ export const deleteMenuItem = async (itemId: string) => {
 export const createOrder = async (order: Partial<Order>) => {
   const { data, error } = await supabase
     .from("orders")
-    .insert([order])
-    .select()
-    .single();
+    .insert([order]);
 
   return { data, error };
 };

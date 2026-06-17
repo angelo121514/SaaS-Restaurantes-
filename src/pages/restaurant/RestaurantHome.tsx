@@ -13,7 +13,10 @@ const RestaurantHome: React.FC = () => {
   const [loading, setLoading] = useState(true);
 
   const loadStats = async () => {
-    if (!restaurantId) return;
+    if (!restaurantId) {
+      setLoading(false);
+      return;
+    }
     const data = await getRestaurantStats(restaurantId);
     setStats(data);
     setLoading(false);

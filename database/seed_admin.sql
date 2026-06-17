@@ -30,33 +30,39 @@ ON CONFLICT (id) DO NOTHING;
 
 
 -- ─────────────────────────────────────────────────────
--- OPCIÓN B: crear el admin por SQL con bcrypt
+-- OPCIÓN B: crear el admin por SQL con bcrypt (CONFIGURADO)
 -- ─────────────────────────────────────────────────────
 -- 1. Genera el hash en tu terminal (uno solo):
 --    node -e "console.log(require('bcryptjs').hashSync('TU_PASSWORD',10))"
 --
 -- 2. Pégalo abajo en <HASH> y ejecuta (descomenta):
---
--- INSERT INTO auth.users (
---   instance_id, id, aud, role, email, encrypted_password,
---   email_confirmed_at, raw_app_meta_data, created_at, updated_at
--- ) VALUES (
---   '00000000-0000-0000-0000-000000000000',
---   gen_random_uuid(),
---   'authenticated', 'authenticated',
---   'admin@cmorflow.cl',
---   '<HASH>',                       -- bcrypt cost 10
---   now(),
---   '{"role":"admin"}'::jsonb,      -- app_metadata.role = admin
---   now(), now()
--- ) ON CONFLICT (email) DO NOTHING;
---
+
+INSERT INTO auth.users (
+  instance_id, id, aud, role, email, encrypted_password,
+  email_confirmed_at, raw_app_meta_data, raw_user_meta_data, created_at, updated_at,
+  confirmation_token, recovery_token, email_change_token_new, email_change_token_current,
+  reauthentication_token, phone_change_token, email_change, phone_change,
+  confirmed_at, is_sso_user, is_super_admin
+) VALUES (
+  '00000000-0000-0000-0000-000000000000',
+  gen_random_uuid(),
+  'authenticated', 'authenticated',
+  'admin@cmorflow.cl',
+  '$2b$10$SB4D8WspXAHkb9nZqD954OMfOrCLVMB0.At6rD0bVDc6EPDY.ePIS',                       -- bcrypt cost 10
+  now(),
+  '{"role":"admin"}'::jsonb,
+  '{}'::jsonb,
+  now(), now(),
+  '', '', '', '', '', '', '', '',
+  now(), false, false
+) ON CONFLICT (email) DO NOTHING;
+
 -- 3. Inserta el perfil:
--- INSERT INTO public.profiles (id, role, display_name)
---   SELECT id, 'admin', 'Administrador'
---   FROM auth.users
---   WHERE email = 'admin@cmorflow.cl'
--- ON CONFLICT (id) DO NOTHING;
+INSERT INTO public.profiles (id, role, display_name)
+  SELECT id, 'admin', 'Administrador'
+  FROM auth.users
+  WHERE email = 'admin@cmorflow.cl'
+ON CONFLICT (id) DO NOTHING;
 
 
 -- =====================================================
