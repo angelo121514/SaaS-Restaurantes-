@@ -107,12 +107,16 @@ RETURNS SETOF public.restaurants
 LANGUAGE sql
 STABLE
 SECURITY DEFINER SET search_path = public
-AS $$
+AS $
   SELECT r.* FROM public.restaurants r
   JOIN public.profiles p ON p.restaurant_id = r.id
   WHERE p.id = auth.uid()
   LIMIT 1;
-$$;
+$;
+
+-- Nota: SETOF public.restaurants funciona porque la función devuelve filas
+-- completas de esa tabla. Si en el futuro se añaden columnas con defaults
+-- complejos, considera cambiar a RETURNS TABLE(...) explícito.
 
 -- ---------------------------------------------------------------------
 -- 4. Cola de INVITACIONES (procesada por la Edge Function o el flujo B)
