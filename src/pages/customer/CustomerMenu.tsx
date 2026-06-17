@@ -22,8 +22,11 @@ import {
   createOrder,
 } from "../../services/restaurantService";
 import type { MenuItem } from "../../config/supabase";
-import { formatCurrency, isValidPhone } from "../../utils/helpers";
+import { formatCurrency } from "../../utils/helpers";
 import { supabase } from "../../config/supabase";
+import { APP_CONFIG } from "../../config/config";
+import { CmorFlowLogo } from "../../components/CmorFlowLogo";
+import { AiChatbot } from "../../components/AiChatbot";
 
 interface CartItem extends MenuItem {
   quantity: number;
@@ -152,7 +155,7 @@ const CustomerMenu: React.FC = () => {
   const cartCount = cart.reduce((sum, item) => sum + item.quantity, 0);
 
   const handleItemClick = (item: MenuItem) => {
-    if (item.sizes && item.sizes.length > 0) {
+    if ((item.sizes && item.sizes.length > 0) || (item.addons && item.addons.length > 0)) {
       setSelectedItem(item);
       setShowItemModal(true);
     } else {
@@ -161,20 +164,19 @@ const CustomerMenu: React.FC = () => {
   };
 
   if (loading) {
-    return <Loading text="Loading menu..." />;
+    return <Loading text="Cargando la carta digital..." />;
   }
 
   if (!restaurant) {
     return (
       <div className="min-h-screen bg-bg-subtle flex items-center justify-center">
-        <Card className="text-center p-8">
+        <Card className="text-center p-8 flex flex-col items-center max-w-md">
           <Package className="w-16 h-16 text-text-secondary mx-auto mb-4 opacity-50" />
           <h2 className="text-2xl font-bold text-text mb-2">
-            Restaurant Not Found
+            Restaurante no encontrado
           </h2>
           <p className="text-text-secondary">
-            The restaurant you're looking for doesn't exist or is currently
-            inactive.
+            El restaurante al que intentas acceder no existe o no se encuentra activo.
           </p>
         </Card>
       </div>
@@ -202,17 +204,23 @@ const CustomerMenu: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 pb-20">
+    <div className="min-h-screen bg-gray-50 pb-24">
       {/* Header */}
       <div className="bg-white shadow-sm sticky top-0 z-40">
         <div className="max-w-screen-lg mx-auto px-4 py-3">
           <div className="flex items-center gap-3 mb-3">
-            {restaurant.logo_url && (
+            {restaurant.logo_url ? (
               <img
                 src={restaurant.logo_url}
                 alt={restaurant.name}
+                width={48}
+                height={48}
                 className="w-12 h-12 rounded-lg object-cover"
               />
+            ) : (
+              <div className="w-12 h-12 rounded-lg bg-accent/5 flex items-center justify-center font-bold text-accent">
+                {restaurant.name.charAt(0)}
+              </div>
             )}
             <div>
               <h1 className="font-bold text-lg text-gray-800">
@@ -227,7 +235,7 @@ const CustomerMenu: React.FC = () => {
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
             <input
               type="text"
-              placeholder="Search for dishes"
+              placeholder="Buscar plato o bebida..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               className="w-full pl-10 pr-4 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-accent/20"
@@ -250,7 +258,7 @@ const CustomerMenu: React.FC = () => {
                     : "bg-gray-100 text-gray-600"
                 }`}
               >
-                {category === "all" ? "All" : category}
+                {category === "all" ? "Todos" : category}
               </button>
             ))}
           </div>
@@ -261,7 +269,7 @@ const CustomerMenu: React.FC = () => {
       <div className="max-w-screen-lg mx-auto px-4 py-4">
         {filteredItems.length === 0 ? (
           <div className="text-center py-20">
-            <p className="text-gray-400 text-sm">No items found</p>
+            <p className="text-gray-400 text-sm">No se encontraron productos</p>
           </div>
         ) : (
           <div className="grid grid-cols-2 gap-3">
@@ -274,34 +282,44 @@ const CustomerMenu: React.FC = () => {
               return (
                 <div
                   key={item.id}
-                  className="bg-white rounded-xl overflow-hidden shadow-sm"
+                  className="bg-white rounded-xl overflow-hidden shadow-sm flex flex-col justify-between"
                 >
-                  <div className="relative h-36">
-                    {item.image_url ? (
-                      <img
-                        src={item.image_url}
-                        alt={item.name}
-                        className="w-full h-full object-cover"
-                      />
-                    ) : (
-                      <div className="w-full h-full bg-gray-100 flex items-center justify-center">
-                        <Package className="w-10 h-10 text-gray-300" />
-                      </div>
-                    )}
-                    {!item.is_available && (
-                      <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
-                        <span className="bg-black/80 text-white text-xs px-2 py-1 rounded">
-                          Not Available
-                        </span>
-                      </div>
-                    )}
+                  <div>
+                    <div className="relative h-36">
+                      {item.image_url ? (
+                        <img
+                          src={item.image_url}
+                          alt={item.name}
+                          loading="lazy"
+                          className="w-full h-full object-cover"
+                        />
+                      ) : (
+                        <div className="w-full h-full bg-gray-100 flex items-center justify-center">
+                          <Package className="w-10 h-10 text-gray-300" />
+                        </div>
+                      )}
+                      {!item.is_available && (
+                        <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
+                          <span className="bg-black/80 text-white text-xs px-2 py-1 rounded">
+                            Agotado
+                          </span>
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="p-3">
+                      <h3 className="font-semibold text-sm text-gray-800 mb-1 line-clamp-2">
+                        {item.name}
+                      </h3>
+                      {item.description && (
+                        <p className="text-xs text-gray-400 line-clamp-2 mt-0.5 leading-tight">
+                          {item.description}
+                        </p>
+                      )}
+                    </div>
                   </div>
 
-                  <div className="p-3">
-                    <h3 className="font-semibold text-sm text-gray-800 mb-1 line-clamp-2 h-10">
-                      {item.name}
-                    </h3>
-
+                  <div className="p-3 pt-0">
                     <div className="flex items-end justify-between mt-2">
                       <div>
                         <p className="font-bold text-gray-800">
@@ -322,19 +340,19 @@ const CustomerMenu: React.FC = () => {
                                   ? handleItemClick(item)
                                   : handleAddSimple(item)
                               }
-                              className="px-5 py-1.5 border-2 border-accent text-accent font-bold text-xs rounded-md hover:shadow-md transition-shadow"
+                              className="px-4 py-1.5 border border-accent text-accent font-bold text-xs rounded-lg hover:bg-accent hover:text-white transition-colors"
                             >
-                              ADD
+                              AÑADIR
                             </button>
                           ) : (
-                            <div className="flex items-center bg-accent text-white rounded-md">
+                            <div className="flex items-center bg-accent text-white rounded-lg">
                               <button
                                 onClick={() => handleRemoveItem(item.id)}
-                                className="px-2 py-1 hover:bg-accent-hover rounded-l-md"
+                                className="px-2 py-1.5 hover:bg-accent-hover rounded-l-lg"
                               >
                                 <Minus className="w-3.5 h-3.5" />
                               </button>
-                              <span className="px-3 font-bold text-sm">
+                              <span className="px-2 font-bold text-xs">
                                 {quantity}
                               </span>
                               <button
@@ -343,7 +361,7 @@ const CustomerMenu: React.FC = () => {
                                     ? handleItemClick(item)
                                     : handleAddSimple(item)
                                 }
-                                className="px-2 py-1 hover:bg-accent-hover rounded-r-md"
+                                className="px-2 py-1.5 hover:bg-accent-hover rounded-r-lg"
                               >
                                 <Plus className="w-3.5 h-3.5" />
                               </button>
@@ -358,6 +376,14 @@ const CustomerMenu: React.FC = () => {
             })}
           </div>
         )}
+      </div>
+
+      {/* Footer Branding */}
+      <div className="py-12 flex flex-col items-center justify-center gap-2 border-t border-border mt-12 text-center max-w-screen-lg mx-auto px-4">
+        <CmorFlowLogo size="sm" showText={true} />
+        <p className="text-xs text-text-secondary">
+          Pedidos interactivos por mesa — Potenciado por CMOR FLOW
+        </p>
       </div>
 
       {/* Cart Modal */}
@@ -414,12 +440,14 @@ const CustomerMenu: React.FC = () => {
               </span>
             </div>
             <div className="flex items-center gap-2 font-semibold text-sm">
-              <span>View Cart</span>
+              <span>Ver Carrito</span>
               <span className="text-lg">›</span>
             </div>
           </button>
         </div>
       )}
+      {/* AI Chatbot Recommendations */}
+      <AiChatbot menuItems={menuItems} onAddToCart={handleAddSimple} />
     </div>
   );
 };
@@ -448,12 +476,12 @@ const CartModal: React.FC<CartModalProps> = ({
   );
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose} title="Your Cart" size="lg">
+    <Modal isOpen={isOpen} onClose={onClose} title="Tu Carrito" size="lg">
       <div className="space-y-6">
         {cart.length === 0 ? (
           <div className="text-center py-8">
             <ShoppingCart className="w-16 h-16 text-text-secondary mx-auto mb-4 opacity-50" />
-            <p className="text-text-secondary">Your cart is empty</p>
+            <p className="text-text-secondary">Tu carrito está vacío</p>
           </div>
         ) : (
           <>
@@ -467,12 +495,12 @@ const CartModal: React.FC<CartModalProps> = ({
                     <h4 className="font-semibold text-text">{item.name}</h4>
                     {item.selectedSize && (
                       <p className="text-sm text-text-secondary">
-                        Size: {item.selectedSize.name}
+                        Tamaño: {item.selectedSize.name}
                       </p>
                     )}
                     {item.selectedAddons.length > 0 && (
                       <p className="text-sm text-text-secondary">
-                        Add-ons:{" "}
+                        Agregados:{" "}
                         {item.selectedAddons.map((a) => a.name).join(", ")}
                       </p>
                     )}
@@ -513,7 +541,7 @@ const CartModal: React.FC<CartModalProps> = ({
                 <span>{formatCurrency(total)}</span>
               </div>
               <Button onClick={onCheckout} fullWidth size="lg">
-                Proceed to Checkout
+                Proceder al Pago / Envío
               </Button>
             </div>
           </>
@@ -572,6 +600,7 @@ const ItemCustomizationModal: React.FC<ItemCustomizationModalProps> = ({
           <img
             src={item.image_url}
             alt={item.name}
+            loading="lazy"
             className="w-full h-48 object-cover rounded-lg"
           />
         )}
@@ -583,7 +612,7 @@ const ItemCustomizationModal: React.FC<ItemCustomizationModalProps> = ({
         {/* Sizes */}
         {item.sizes && item.sizes.length > 0 && (
           <div>
-            <h4 className="font-semibold text-text mb-3">Select Size</h4>
+            <h4 className="font-semibold text-text mb-3">Selecciona el Tamaño</h4>
             <div className="space-y-2">
               {item.sizes.map((size) => (
                 <button
@@ -608,7 +637,7 @@ const ItemCustomizationModal: React.FC<ItemCustomizationModalProps> = ({
         {/* Addons */}
         {item.addons && item.addons.length > 0 && (
           <div>
-            <h4 className="font-semibold text-text mb-3">Add-ons (Optional)</h4>
+            <h4 className="font-semibold text-text mb-3">Agregados Adicionales (Opcional)</h4>
             <div className="space-y-2">
               {item.addons.map((addon) => (
                 <button
@@ -640,7 +669,7 @@ const ItemCustomizationModal: React.FC<ItemCustomizationModalProps> = ({
             fullWidth
             size="lg"
           >
-            Add to Cart
+            Agregar al Carrito
           </Button>
         </div>
       </div>
@@ -677,7 +706,7 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
     (sum, item) => sum + item.itemTotal * item.quantity,
     0
   );
-  const tax = subtotal * 0.05; // 5% tax
+  const tax = subtotal * APP_CONFIG.taxRate; // 19% IVA (Chile)
   const total = subtotal + tax;
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -685,17 +714,17 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
     setError("");
 
     if (!customerName.trim()) {
-      setError("Please enter your name");
+      setError("Por favor ingresa tu nombre");
       return;
     }
 
-    if (!isValidPhone(customerPhone)) {
-      setError("Please enter a valid 10-digit phone number");
+    if (!customerPhone.trim() || customerPhone.replace(/[\s\-()]/g, "").length < 8) {
+      setError("Por favor ingresa un número de teléfono válido");
       return;
     }
 
     if (orderType === "table" && !tableNumber.trim()) {
-      setError("Please enter table number");
+      setError("Por favor indica tu número de mesa");
       return;
     }
 
@@ -735,7 +764,7 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
         resetForm();
       }, 2000);
     } else {
-      setError(orderError?.message || "Failed to place order");
+      setError(orderError?.message || "No se pudo realizar el pedido");
     }
   };
 
@@ -750,18 +779,17 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
 
   if (success) {
     return (
-      <Modal isOpen={isOpen} onClose={onClose} title="Order Placed!" size="md">
+      <Modal isOpen={isOpen} onClose={onClose} title="¡Pedido Enviado!" size="md">
         <div className="text-center py-8">
           <CheckCircle className="w-16 h-16 text-success mx-auto mb-4" />
           <h3 className="text-2xl font-bold text-text mb-2">
-            Order Successful!
+            ¡Pedido Exitoso!
           </h3>
           <p className="text-text-secondary mb-6">
-            Your order has been placed successfully. The restaurant will prepare
-            it shortly.
+            Tu pedido ha sido recibido por la cocina. Estará listo a la brevedad.
           </p>
           <Button onClick={onClose} fullWidth>
-            Close
+            Cerrar
           </Button>
         </div>
       </Modal>
@@ -769,13 +797,13 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
   }
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose} title="Checkout" size="lg">
+    <Modal isOpen={isOpen} onClose={onClose} title="Enviar Pedido" size="lg">
       <form onSubmit={handleSubmit} className="space-y-6">
         {error && <Alert type="error" message={error} />}
 
         {/* Order Type */}
         <div>
-          <label className="label mb-3">Order Type</label>
+          <label className="label mb-3">Opción de Entrega</label>
           <div className="grid grid-cols-2 gap-3">
             <button
               type="button"
@@ -786,7 +814,7 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
                   : "border-border hover:border-accent/50"
               }`}
             >
-              Dine In (Table)
+              Consumo en Local
             </button>
             <button
               type="button"
@@ -797,7 +825,7 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
                   : "border-border hover:border-accent/50"
               }`}
             >
-              Takeaway / Parcel
+              Para Llevar
             </button>
           </div>
         </div>
@@ -805,40 +833,40 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
         {/* Table Number (only for table orders) */}
         {orderType === "table" && (
           <Input
-            label="Table Number"
+            label="Número de Mesa"
             value={tableNumber}
             onChange={(e) => setTableNumber(e.target.value)}
-            placeholder="Enter your table number"
+            placeholder="Ej: Mesa 4, Barra, Terraza 2"
             required
           />
         )}
 
         {/* Customer Details */}
         <Input
-          label="Your Name"
+          label="Tu Nombre"
           value={customerName}
           onChange={(e) => setCustomerName(e.target.value)}
-          placeholder="Enter your name"
+          placeholder="Escribe tu nombre"
           required
         />
 
         <Input
-          label="Phone Number"
+          label="Número de Teléfono"
           type="tel"
           value={customerPhone}
           onChange={(e) => setCustomerPhone(e.target.value)}
-          placeholder="10-digit mobile number"
+          placeholder="Ej: +56912345678"
           required
-          helperText="We'll use this to contact you about your order"
+          helperText="Te contactaremos a este número si hay alguna duda con tu orden"
         />
 
         {/* Special Instructions */}
         <div>
-          <label className="label mb-2">Special Instructions (Optional)</label>
+          <label className="label mb-2">Comentarios o Indicaciones Especiales (Opcional)</label>
           <textarea
             value={notes}
             onChange={(e) => setNotes(e.target.value)}
-            placeholder="Any special requests for your order..."
+            placeholder="Ej: Sin cebolla, aderezos aparte, servilletas extra..."
             rows={3}
             className="input-field"
           />
@@ -846,7 +874,7 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
 
         {/* Order Summary */}
         <div className="bg-bg-subtle rounded-lg p-4 space-y-2">
-          <h4 className="font-semibold text-text mb-3">Order Summary</h4>
+          <h4 className="font-semibold text-text mb-3">Resumen de tu Pedido</h4>
           {cart.map((item, index) => (
             <div key={index} className="flex justify-between text-sm">
               <span className="text-text-secondary">
@@ -859,15 +887,15 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
             </div>
           ))}
           <div className="border-t border-border pt-2 mt-2 space-y-1">
-            <div className="flex justify-between text-text-secondary">
+            <div className="flex justify-between text-text-secondary text-xs">
               <span>Subtotal</span>
               <span>{formatCurrency(subtotal)}</span>
             </div>
-            <div className="flex justify-between text-text-secondary">
-              <span>Tax (5%)</span>
+            <div className="flex justify-between text-text-secondary text-xs">
+              <span>IVA (19%)</span>
               <span>{formatCurrency(tax)}</span>
             </div>
-            <div className="flex justify-between text-xl font-bold text-text pt-2 border-t border-border">
+            <div className="flex justify-between text-lg font-bold text-text pt-2 border-t border-border">
               <span>Total</span>
               <span>{formatCurrency(total)}</span>
             </div>
@@ -877,10 +905,10 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
         {/* Actions */}
         <div className="flex gap-3">
           <Button type="button" variant="outline" onClick={onClose} fullWidth>
-            Cancel
+            Cancelar
           </Button>
           <Button type="submit" loading={loading} fullWidth>
-            Place Order
+            Confirmar y Enviar Pedido
           </Button>
         </div>
       </form>

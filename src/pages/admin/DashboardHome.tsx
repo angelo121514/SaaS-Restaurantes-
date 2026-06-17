@@ -40,9 +40,9 @@ const DashboardHome: React.FC = () => {
     <div className="space-y-8">
       {/* Welcome */}
       <div>
-        <h2 className="text-2xl font-bold text-text mb-2">Platform Overview</h2>
+        <h2 className="text-2xl font-bold text-text mb-2">Resumen de la Plataforma</h2>
         <p className="text-text-secondary">
-          Monitor your restaurant network performance
+          Monitorea el rendimiento de tu red de restaurantes afiliados.
         </p>
       </div>
 
@@ -52,7 +52,7 @@ const DashboardHome: React.FC = () => {
           <div className="flex items-start justify-between">
             <div>
               <p className="text-text-secondary text-sm mb-1">
-                Active Restaurants
+                Restaurantes Activos
               </p>
               <p className="text-3xl font-bold text-text">
                 {stats.activeRestaurants}
@@ -68,7 +68,7 @@ const DashboardHome: React.FC = () => {
           <div className="flex items-start justify-between">
             <div>
               <p className="text-text-secondary text-sm mb-1">
-                Pending Requests
+                Solicitudes Pendientes
               </p>
               <p className="text-3xl font-bold text-text">
                 {stats.pendingRequests}
@@ -78,7 +78,7 @@ const DashboardHome: React.FC = () => {
                   to="/admin/requests"
                   className="text-sm text-accent hover:underline mt-2 inline-block"
                 >
-                  Review now →
+                  Revisar ahora →
                 </Link>
               )}
             </div>
@@ -91,13 +91,13 @@ const DashboardHome: React.FC = () => {
         <Card className="hover:shadow-md transition-shadow">
           <div className="flex items-start justify-between">
             <div>
-              <p className="text-text-secondary text-sm mb-1">Total Orders</p>
+              <p className="text-text-secondary text-sm mb-1">Pedidos Totales</p>
               <p className="text-3xl font-bold text-text">
                 {stats.totalOrders}
               </p>
               <p className="text-sm text-success flex items-center mt-1">
                 <TrendingUp className="w-4 h-4 mr-1" />
-                All time
+                Histórico
               </p>
             </div>
             <div className="p-3 bg-accent-secondary/10 rounded-lg">
@@ -110,12 +110,12 @@ const DashboardHome: React.FC = () => {
           <div className="flex items-start justify-between">
             <div>
               <p className="text-text-secondary text-sm mb-1">
-                Today's Revenue
+                Ingresos de Hoy
               </p>
               <p className="text-3xl font-bold text-text">
                 {formatCurrency(stats.todayRevenue)}
               </p>
-              <p className="text-sm text-text-secondary mt-1">Platform-wide</p>
+              <p className="text-sm text-text-secondary mt-1">Toda la red</p>
             </div>
             <div className="p-3 bg-success/10 rounded-lg">
               <DollarSign className="w-6 h-6 text-success" />
@@ -126,16 +126,16 @@ const DashboardHome: React.FC = () => {
 
       {/* Quick Actions */}
       <Card>
-        <h3 className="text-lg font-semibold text-text mb-4">Quick Actions</h3>
+        <h3 className="text-lg font-semibold text-text mb-4">Acciones Rápidas</h3>
         <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
           <Link
             to="/admin/requests"
             className="p-4 border border-border rounded-lg hover:border-accent hover:bg-bg-subtle transition-all"
           >
             <FileText className="w-8 h-8 text-accent mb-2" />
-            <h4 className="font-semibold text-text mb-1">Review Requests</h4>
+            <h4 className="font-semibold text-text mb-1">Revisar Solicitudes</h4>
             <p className="text-sm text-text-secondary">
-              {stats.pendingRequests} pending verification
+              {stats.pendingRequests} pendientes por verificar
             </p>
           </Link>
 
@@ -144,9 +144,9 @@ const DashboardHome: React.FC = () => {
             className="p-4 border border-border rounded-lg hover:border-accent hover:bg-bg-subtle transition-all"
           >
             <StoreIcon className="w-8 h-8 text-accent mb-2" />
-            <h4 className="font-semibold text-text mb-1">Manage Restaurants</h4>
+            <h4 className="font-semibold text-text mb-1">Gestionar Restaurantes</h4>
             <p className="text-sm text-text-secondary">
-              {stats.activeRestaurants} active restaurants
+              {stats.activeRestaurants} locales registrados
             </p>
           </Link>
 
@@ -155,9 +155,9 @@ const DashboardHome: React.FC = () => {
             className="p-4 border border-border rounded-lg hover:border-accent hover:bg-bg-subtle transition-all"
           >
             <TrendingUp className="w-8 h-8 text-accent mb-2" />
-            <h4 className="font-semibold text-text mb-1">View Analytics</h4>
+            <h4 className="font-semibold text-text mb-1">Ver Métricas</h4>
             <p className="text-sm text-text-secondary">
-              Platform performance metrics
+              Estadísticas globales de la plataforma
             </p>
           </Link>
         </div>
@@ -168,15 +168,14 @@ const DashboardHome: React.FC = () => {
         <div className="bg-warning/10 border border-warning/20 rounded-lg p-4 flex items-start">
           <AlertCircle className="w-5 h-5 text-warning mr-3 flex-shrink-0 mt-0.5" />
           <div>
-            <h4 className="font-semibold text-text mb-1">Action Required</h4>
+            <h4 className="font-semibold text-text mb-1">Atención Requerida</h4>
             <p className="text-text-secondary text-sm">
-              You have {stats.pendingRequests} pending registration request
-              {stats.pendingRequests > 1 ? "s" : ""} waiting for review.{" "}
+              Tienes {stats.pendingRequests} solicitud{stats.pendingRequests > 1 ? "es" : ""} de registro pendiente{stats.pendingRequests > 1 ? "es" : ""} esperando revisión.{" "}
               <Link
                 to="/admin/requests"
                 className="text-accent hover:underline font-medium"
               >
-                Review now
+                Revisar ahora
               </Link>
             </p>
           </div>

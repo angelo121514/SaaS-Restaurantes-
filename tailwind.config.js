@@ -1,19 +1,32 @@
 /** @type {import('tailwindcss').Config} */
 export default {
   content: ["./index.html", "./src/**/*.{js,ts,jsx,tsx}"],
+  darkMode: "class",
   theme: {
     extend: {
       colors: {
-        bg: "#FFFFFF",
-        "bg-subtle": "#FAFAFA",
-        text: "#0A0A0A",
-        "text-secondary": "#6B6B6B",
-        accent: "#000000",
-        "accent-secondary": "#6366F1",
-        border: "#E5E5E5",
+        bg: "rgb(var(--color-bg) / <alpha-value>)",
+        "bg-subtle": "rgb(var(--color-bg-subtle) / <alpha-value>)",
+        text: "rgb(var(--color-text) / <alpha-value>)",
+        "text-secondary": "rgb(var(--color-text-secondary) / <alpha-value>)",
+        accent: "rgb(var(--color-accent) / <alpha-value>)",
+        "accent-secondary": "rgb(var(--color-accent-secondary) / <alpha-value>)",
+        border: "rgb(var(--color-border) / <alpha-value>)",
         success: "#10B981",
         error: "#EF4444",
         warning: "#F59E0B",
+        zinc: {
+          150: "#ECEEEF",
+          350: "#B9BDC1",
+          450: "#8C939B",
+          650: "#4B515A",
+          805: "#23262B",
+          850: "#1F2227",
+        },
+        red: {
+          650: "#DC2626",
+          750: "#B91C1C",
+        }
       },
       fontFamily: {
         sans: ["Inter", "system-ui", "sans-serif"],

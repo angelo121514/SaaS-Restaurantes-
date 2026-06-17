@@ -9,95 +9,104 @@ export const SUPABASE_ANON_KEY =
 
 // Application Configuration
 export const APP_CONFIG = {
-  appName: "FoodOrder",
-  defaultCurrency: "₹",
-  taxRate: 0.05, // 5% GST
-  orderPrefix: "ORD",
+  appName: "CMOR FLOW",
+  defaultCurrency: "$",
+  taxRate: 0.19, // 19% IVA (Chile)
+  orderPrefix: "PED",
 
   // Subscription plans
   plans: {
     free_trial: {
-      name: "Free Trial",
+      name: "Prueba Gratuita",
       price: 0,
-      duration: "14 days",
+      price_annual: 0,
+      duration: "30 días",
       features: [
-        "Up to 50 orders/month",
-        "Basic menu management",
-        "QR ordering",
-        "Email support",
+        "Hasta 50 pedidos/mes",
+        "Gestión básica de menú",
+        "Pedidos por código QR",
+        "Soporte por correo electrónico",
       ],
     },
     starter: {
-      name: "Starter",
-      price: 299,
-      duration: "per month",
+      name: "Básico (Starter)",
+      price: 40000,
+      price_annual: 432000, // 40.000 * 12 * 0.9
+      duration: "por mes",
       features: [
-        "Unlimited orders",
-        "Full menu management",
-        "QR ordering",
-        "Reports",
-        "WhatsApp support",
+        "Pedidos ilimitados",
+        "Gestión completa de menú",
+        "Pedidos por código QR",
+        "Reportes básicos",
+        "Soporte por WhatsApp",
       ],
     },
     pro: {
       name: "Pro",
-      price: 599,
-      duration: "per month",
+      price: 120000,
+      price_annual: 1296000, // 120.000 * 12 * 0.9
+      duration: "por mes",
       features: [
-        "Everything in Starter",
-        "Multiple locations",
-        "Advanced analytics",
-        "Custom branding",
-        "Priority support",
+        "Todo lo del plan Básico",
+        "Página web personalizada, posicionada en Google y con botones de llamada de acción",
+        "Multi-sucursal",
+        "Estadísticas y reportes avanzados",
+        "Marca personalizada",
+        "Recomendaciones con Inteligencia Artificial (IA)",
+        "CRM Integrado de Clientes",
+        "Soporte Premium 24/7",
       ],
     },
   },
 
   // Restaurant types
   restaurantTypes: [
-    "Restaurant",
+    "Restaurante",
     "Food Truck",
-    "Cafe",
-    "Bakery",
-    "Cloud Kitchen",
-    "Fine Dining",
-    "Quick Service",
-    "Other",
+    "Cafetería",
+    "Pastelería / Panadería",
+    "Cocina Oculta (Cloud Kitchen)",
+    "Cena Fina",
+    "Comida Rápida",
+    "Pizzería",
+    "Sushi bar",
+    "Otro",
   ],
 
   // Menu categories
   menuCategories: [
-    "Starters",
-    "Main Course",
-    "Breakfast",
-    "Lunch",
-    "Dinner",
-    "Beverages",
-    "Desserts",
-    "Snacks",
-    "Other",
+    "Entradas",
+    "Platos Principales",
+    "Desayunos",
+    "Almuerzos",
+    "Bebidas",
+    "Postres",
+    "Pizzas",
+    "Sushi",
+    "Snacks / Sándwiches",
+    "Otro",
   ],
 
   // Order statuses
   orderStatuses: {
-    pending: { label: "Pending", color: "warning" },
-    accepted: { label: "Accepted", color: "accent-secondary" },
-    preparing: { label: "Preparing", color: "accent-secondary" },
-    ready: { label: "Ready", color: "success" },
-    completed: { label: "Completed", color: "success" },
-    cancelled: { label: "Cancelled", color: "error" },
-    rejected: { label: "Rejected", color: "error" },
+    pending: { label: "Pendiente", color: "warning" },
+    accepted: { label: "Aceptado", color: "accent-secondary" },
+    preparing: { label: "Preparando", color: "accent-secondary" },
+    ready: { label: "Listo", color: "success" },
+    completed: { label: "Completado", color: "success" },
+    cancelled: { label: "Cancelado", color: "error" },
+    rejected: { label: "Rechazado", color: "error" },
   },
 
   // Payment methods
-  paymentMethods: ["Cash", "UPI", "Card", "Other"],
+  paymentMethods: ["Efectivo", "Transferencia", "Tarjeta de Débito/Crédito", "Otro"],
 
   // Registration sources
   heardFromOptions: [
-    "Google Search",
-    "Social Media",
-    "Friend/Referral",
-    "Advertisement",
-    "Other",
+    "Búsqueda en Google",
+    "Redes Sociales",
+    "Recomendación de un Amigo",
+    "Publicidad",
+    "Otro",
   ],
 };

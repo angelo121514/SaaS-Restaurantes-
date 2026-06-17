@@ -23,32 +23,38 @@ import {
 } from "../../services/restaurantService";
 import type { Order } from "../../config/supabase";
 import { formatDateTime, formatCurrency, playSound } from "../../utils/helpers";
+import { useRestaurantId } from "../../hooks/useAuth";
 
 const Orders: React.FC = () => {
+  const restaurantId = useRestaurantId();
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [showDetailsModal, setShowDetailsModal] = useState(false);
   const [showRejectModal, setShowRejectModal] = useState(false);
   const [statusFilter, setStatusFilter] = useState<string>("pending");
-  const prevOrderCountRef = useRef(0);
+  // IDs de pedidos ya vistos (evita el stale closure sobre `orders`).
+  const seenOrderIdsRef = useRef<Set<string>>(new Set());
+  const firstLoadRef = useRef(true);
 
   useEffect(() => {
-    const user = JSON.parse(localStorage.getItem("user") || "{}");
-    if (!user.restaurant_id) return;
+    if (!restaurantId) return;
+    setLoading(true);
+    seenOrderIdsRef.current = new Set();
+    firstLoadRef.current = true;
 
-    const subscription = subscribeToOrders(user.restaurant_id, (data) => {
-      // Play sound if new order arrived
-      if (data.length > prevOrderCountRef.current) {
-        const newOrders = data.filter(
-          (order) =>
-            order.status === "pending" && !orders.find((o) => o.id === order.id)
+    const subscription = subscribeToOrders(restaurantId, (data) => {
+      // Detectar pedidos nuevos (no vistos antes) tras la primera carga.
+      if (!firstLoadRef.current) {
+        const fresh = data.filter(
+          (o) => o.status === "pending" && !seenOrderIdsRef.current.has(o.id)
         );
-        if (newOrders.length > 0) {
+        if (fresh.length > 0) {
           playSound("notification");
         }
       }
-      prevOrderCountRef.current = data.length;
+      data.forEach((o) => seenOrderIdsRef.current.add(o.id));
+      firstLoadRef.current = false;
       setOrders(data);
       setLoading(false);
     });
@@ -56,7 +62,7 @@ const Orders: React.FC = () => {
     return () => {
       subscription.unsubscribe();
     };
-  }, []);
+  }, [restaurantId]);
 
   const filteredOrders = orders
     .filter((order) => order.status === statusFilter)
@@ -70,7 +76,7 @@ const Orders: React.FC = () => {
   const handleStatusUpdate = async (orderId: string, newStatus: string) => {
     const success = await updateOrderStatus(orderId, newStatus);
     if (!success) {
-      alert("Failed to update order status");
+      alert("Error al actualizar el estado del pedido");
     }
   };
 
@@ -80,6 +86,13 @@ const Orders: React.FC = () => {
   };
 
   const getStatusBadge = (status: string) => {
+    const labels: Record<string, string> = {
+      pending: "Pendiente",
+      accepted: "Preparando",
+      completed: "Completado",
+      cancelled: "Cancelado",
+      rejected: "Rechazado",
+    };
     const variants: Record<string, any> = {
       pending: "warning",
       accepted: "accent-secondary",
@@ -87,7 +100,7 @@ const Orders: React.FC = () => {
       cancelled: "neutral",
       rejected: "error",
     };
-    return <Badge variant={variants[status] || "neutral"}>{status}</Badge>;
+    return <Badge variant={variants[status] || "neutral"}>{labels[status] || status}</Badge>;
   };
 
   const getStatusIcon = (status: string) => {
@@ -107,7 +120,7 @@ const Orders: React.FC = () => {
   };
 
   if (loading) {
-    return <Loading text="Loading orders..." />;
+    return <Loading text="Cargando pedidos en tiempo real..." />;
   }
 
   const pendingCount = orders.filter((o) => o.status === "pending").length;
@@ -117,14 +130,14 @@ const Orders: React.FC = () => {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-2xl font-bold text-text mb-2">Orders</h2>
+          <h2 className="text-2xl font-bold text-text mb-2">Pedidos Recibidos</h2>
           <p className="text-text-secondary">
-            Manage and track customer orders in real-time
+            Administra y despacha las órdenes de tus clientes en tiempo real
           </p>
         </div>
         {pendingCount > 0 && (
           <Badge variant="warning" className="text-lg px-4 py-2 animate-pulse">
-            {pendingCount} Pending
+            {pendingCount} Pendiente{pendingCount !== 1 ? "s" : ""}
           </Badge>
         )}
       </div>
@@ -132,23 +145,28 @@ const Orders: React.FC = () => {
       {/* Real-time indicator */}
       <div className="flex items-center space-x-2 text-sm text-success">
         <div className="w-2 h-2 bg-success rounded-full animate-pulse" />
-        <span>Live order updates • Sound notifications enabled</span>
+        <span>Actualizaciones en vivo • Alertas sonoras habilitadas</span>
       </div>
 
       {/* Status Filter */}
       <div className="flex flex-wrap gap-2">
-        {["pending", "accepted", "completed", "cancelled"].map((status) => (
+        {[
+          { key: "pending", label: "Pendientes" },
+          { key: "accepted", label: "En Cocina" },
+          { key: "completed", label: "Completados" },
+          { key: "cancelled", label: "Cancelados" },
+        ].map((status) => (
           <button
-            key={status}
-            onClick={() => setStatusFilter(status)}
+            key={status.key}
+            onClick={() => setStatusFilter(status.key)}
             className={`px-4 py-2 rounded-lg font-medium transition-colors ${
-              statusFilter === status
+              statusFilter === status.key
                 ? "bg-accent text-white"
-                : "bg-bg-subtle text-text-secondary hover:bg-border"
+                : "bg-white text-text-secondary border border-border hover:bg-bg-subtle"
             }`}
           >
-            {status.charAt(0).toUpperCase() + status.slice(1)}
-            {status === "pending" && ` (${pendingCount})`}
+            {status.label}
+            {status.key === "pending" && pendingCount > 0 && ` (${pendingCount})`}
           </button>
         ))}
       </div>
@@ -158,10 +176,10 @@ const Orders: React.FC = () => {
         <Card className="text-center py-12">
           <Package className="w-16 h-16 text-text-secondary mx-auto mb-4 opacity-50" />
           <h3 className="text-xl font-semibold text-text mb-2">
-            No Orders Found
+            No se encontraron pedidos
           </h3>
           <p className="text-text-secondary">
-            No {statusFilter} orders at the moment.
+            No tienes pedidos en esta categoría por el momento.
           </p>
         </Card>
       ) : (
@@ -182,7 +200,7 @@ const Orders: React.FC = () => {
                       {getStatusIcon(order.status)}
                       <div>
                         <h3 className="text-lg font-bold text-text">
-                          Order #{order.order_number}
+                          Pedido #{order.order_number}
                         </h3>
                         <p className="text-sm text-text-secondary">
                           {formatDateTime(order.created_at)}
@@ -197,9 +215,9 @@ const Orders: React.FC = () => {
                     <div className="flex items-center space-x-2 text-text-secondary">
                       <Package className="w-4 h-4" />
                       <span>
-                        {order.order_type} •{" "}
-                        {order.table_number && `Table ${order.table_number}`}
-                        {!order.table_number && "Takeaway"}
+                        Canal: QR •{" "}
+                        {order.table_number && `${order.table_number}`}
+                        {!order.table_number && "Para Llevar"}
                       </span>
                     </div>
                     {order.customer_phone && (
@@ -221,7 +239,7 @@ const Orders: React.FC = () => {
                     )}
                     <div className="flex items-center space-x-2 text-text-secondary">
                       <span className="font-semibold text-text">
-                        {order.items?.length || 0} items
+                        {order.items?.length || 0} plato{order.items?.length !== 1 ? "s" : ""}
                       </span>
                       <span>•</span>
                       <span className="font-bold text-text text-lg">
@@ -235,7 +253,7 @@ const Orders: React.FC = () => {
                     <div className="flex items-start space-x-2 text-sm bg-bg-subtle rounded-lg p-3">
                       <MessageSquare className="w-4 h-4 text-accent-secondary mt-0.5" />
                       <div>
-                        <p className="font-medium text-text">Customer Notes:</p>
+                        <p className="font-medium text-text">Notas del Cliente:</p>
                         <p className="text-text-secondary">
                           {order.customer_notes}
                         </p>
@@ -252,7 +270,7 @@ const Orders: React.FC = () => {
                     fullWidth
                     onClick={() => handleViewDetails(order)}
                   >
-                    View Details
+                    Ver Detalles
                   </Button>
 
                   {order.status === "pending" && (
@@ -263,7 +281,7 @@ const Orders: React.FC = () => {
                         fullWidth
                         onClick={() => handleStatusUpdate(order.id, "accepted")}
                       >
-                        Accept
+                        Aceptar
                       </Button>
                       <Button
                         variant="outline"
@@ -274,7 +292,7 @@ const Orders: React.FC = () => {
                           setShowRejectModal(true);
                         }}
                       >
-                        Cancel
+                        Rechazar
                       </Button>
                     </>
                   )}
@@ -289,7 +307,7 @@ const Orders: React.FC = () => {
                           handleStatusUpdate(order.id, "completed")
                         }
                       >
-                        Mark Complete
+                        Marcar Completado
                       </Button>
                       <Button
                         variant="outline"
@@ -300,7 +318,7 @@ const Orders: React.FC = () => {
                           setShowRejectModal(true);
                         }}
                       >
-                        Cancel
+                        Cancelar
                       </Button>
                     </>
                   )}
@@ -353,13 +371,13 @@ const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({
     <Modal
       isOpen={isOpen}
       onClose={onClose}
-      title={`Order #${order.order_number}`}
+      title={`Detalle de Pedido #${order.order_number}`}
       size="lg"
     >
       <div className="space-y-6">
         {/* Status */}
         <div className="flex items-center justify-between p-4 bg-bg-subtle rounded-lg">
-          <span className="font-medium text-text">Status</span>
+          <span className="font-medium text-text">Estado del Pedido</span>
           <Badge
             variant={
               order.status === "completed"
@@ -369,42 +387,36 @@ const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({
                 : "neutral"
             }
           >
-            {order.status}
+            {order.status === "pending" ? "Pendiente" : order.status === "accepted" ? "En cocina" : order.status === "completed" ? "Completado" : order.status}
           </Badge>
         </div>
 
         {/* Customer Info */}
         <div>
-          <h4 className="font-semibold text-text mb-3">Customer Information</h4>
+          <h4 className="font-semibold text-text mb-3">Información del Cliente</h4>
           <div className="space-y-2 text-sm">
             {order.customer_name && (
               <p className="text-text-secondary">
-                <strong className="text-text">Name:</strong>{" "}
+                <strong className="text-text">Nombre:</strong>{" "}
                 {order.customer_name}
               </p>
             )}
             {order.customer_phone && (
               <p className="text-text-secondary">
-                <strong className="text-text">Phone:</strong>{" "}
+                <strong className="text-text">Teléfono:</strong>{" "}
                 {order.customer_phone}
               </p>
             )}
             <p className="text-text-secondary">
-              <strong className="text-text">Order Type:</strong>{" "}
-              {order.order_type}
+              <strong className="text-text">Mesa / Entrega:</strong>{" "}
+              {order.table_number || "Para Llevar"}
             </p>
-            {order.table_number && (
-              <p className="text-text-secondary">
-                <strong className="text-text">Table:</strong>{" "}
-                {order.table_number}
-              </p>
-            )}
           </div>
         </div>
 
         {/* Order Items */}
         <div>
-          <h4 className="font-semibold text-text mb-3">Order Items</h4>
+          <h4 className="font-semibold text-text mb-3">Platos Solicitados</h4>
           <div className="space-y-3">
             {order.items?.map((item: any, index: number) => (
               <div
@@ -415,14 +427,14 @@ const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({
                   <p className="font-medium text-text">
                     {item.quantity}x {item.name}
                   </p>
-                  {item.size && (
+                  {item.selected_size && (
                     <p className="text-sm text-text-secondary">
-                      Size: {item.size}
+                      Tamaño: {item.selected_size.name}
                     </p>
                   )}
-                  {item.addons && item.addons.length > 0 && (
+                  {item.selected_addons && item.selected_addons.length > 0 && (
                     <p className="text-sm text-text-secondary">
-                      Add-ons: {item.addons.join(", ")}
+                      Agregados: {item.selected_addons.map((a: any) => a.name).join(", ")}
                     </p>
                   )}
                 </div>
@@ -441,12 +453,12 @@ const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({
             <span>{formatCurrency(order.subtotal)}</span>
           </div>
           <div className="flex justify-between text-text-secondary">
-            <span>Tax</span>
+            <span>IVA (19%)</span>
             <span>{formatCurrency(order.tax)}</span>
           </div>
           {order.discount && order.discount > 0 && (
             <div className="flex justify-between text-success">
-              <span>Discount</span>
+              <span>Descuento</span>
               <span>-{formatCurrency(order.discount)}</span>
             </div>
           )}
@@ -459,7 +471,7 @@ const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({
         {/* Notes */}
         {order.customer_notes && (
           <div className="bg-accent-secondary/10 border border-accent-secondary/20 rounded-lg p-4">
-            <h4 className="font-semibold text-text mb-2">Customer Notes</h4>
+            <h4 className="font-semibold text-text mb-2">Comentarios del Cliente</h4>
             <p className="text-text-secondary text-sm">
               {order.customer_notes}
             </p>
@@ -469,20 +481,20 @@ const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({
         {/* Payment Info */}
         {order.payment_method && (
           <div>
-            <h4 className="font-semibold text-text mb-2">Payment</h4>
+            <h4 className="font-semibold text-text mb-2">Pago</h4>
             <p className="text-text-secondary text-sm">
-              Method: {order.payment_method}
+              Método: {order.payment_method}
             </p>
             {order.payment_transaction_id && (
               <p className="text-text-secondary text-sm">
-                Transaction ID: {order.payment_transaction_id}
+                ID Transacción: {order.payment_transaction_id}
               </p>
             )}
           </div>
         )}
 
         <Button onClick={onClose} fullWidth>
-          Close
+          Cerrar Detalle
         </Button>
       </div>
     </Modal>
@@ -515,27 +527,27 @@ const RejectOrderModal: React.FC<RejectOrderModalProps> = ({
   if (!order) return null;
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose} title="Cancel Order" size="md">
+    <Modal isOpen={isOpen} onClose={onClose} title="Cancelar Pedido" size="md">
       <div className="space-y-4">
         <Alert
           type="warning"
-          message="Are you sure you want to cancel this order? This action cannot be undone."
+          message="¿Estás seguro de que deseas cancelar esta orden? Esta acción quitará la orden de la cocina y no se puede deshacer."
         />
 
         <Textarea
-          label="Reason for Cancellation (Optional)"
+          label="Motivo de la Cancelación (Opcional)"
           value={reason}
           onChange={(e) => setReason(e.target.value)}
-          placeholder="E.g., Out of stock, Kitchen closed, Customer requested, etc."
+          placeholder="Ej: Ingrediente agotado, local cerrado, etc..."
           rows={3}
         />
 
         <div className="flex gap-3">
           <Button variant="outline" onClick={onClose} fullWidth>
-            Back
+            Volver
           </Button>
           <Button variant="danger" onClick={handleCancel} fullWidth>
-            Cancel Order
+            Confirmar Cancelación
           </Button>
         </div>
       </div>

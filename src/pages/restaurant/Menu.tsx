@@ -18,9 +18,12 @@ import {
   toggleMenuItemAvailability,
 } from "../../services/restaurantService";
 import type { MenuItem } from "../../config/supabase";
-import { formatCurrency } from "../../utils/helpers";
+import { formatCurrency, getStoredUser } from "../../utils/helpers";
+import { useRestaurantId } from "../../hooks/useAuth";
+import { ImageDropZone } from "../../components/ImageDropZone";
 
 const Menu: React.FC = () => {
+  const restaurantId = useRestaurantId();
   const [menuItems, setMenuItems] = useState<MenuItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
@@ -31,10 +34,9 @@ const Menu: React.FC = () => {
   const [showDeleteModal, setShowDeleteModal] = useState(false);
 
   useEffect(() => {
-    const user = JSON.parse(localStorage.getItem("user") || "{}");
-    if (!user.restaurant_id) return;
+    if (!restaurantId) return;
 
-    const subscription = subscribeToMenuItems(user.restaurant_id, (data) => {
+    const subscription = subscribeToMenuItems(restaurantId, (data) => {
       setMenuItems(data);
       setLoading(false);
     });
@@ -42,7 +44,7 @@ const Menu: React.FC = () => {
     return () => {
       subscription.unsubscribe();
     };
-  }, []);
+  }, [restaurantId]);
 
   const categories = [
     "all",
@@ -73,7 +75,7 @@ const Menu: React.FC = () => {
   };
 
   if (loading) {
-    return <Loading text="Loading menu..." />;
+    return <Loading text="Cargando tu menú..." />;
   }
 
   return (
@@ -81,16 +83,16 @@ const Menu: React.FC = () => {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-2xl font-bold text-text mb-2">Menu Management</h2>
+          <h2 className="text-2xl font-bold text-text mb-2">Gestión del Menú</h2>
           <p className="text-text-secondary">
-            Manage your menu items and availability
+            Administra los platos de tu carta y su disponibilidad para los clientes.
           </p>
         </div>
         <Button
           icon={<Plus className="w-5 h-5" />}
           onClick={() => setShowAddModal(true)}
         >
-          Add Item
+          Agregar Plato
         </Button>
       </div>
 
@@ -98,7 +100,7 @@ const Menu: React.FC = () => {
       <div className="flex items-center space-x-2 text-sm text-success">
         <div className="w-2 h-2 bg-success rounded-full animate-pulse" />
         <span>
-          Live updates • Availability changes update customers in real-time
+          Actualización en tiempo real activa • Los cambios de disponibilidad se muestran de inmediato en la carta de clientes.
         </span>
       </div>
 
@@ -106,7 +108,7 @@ const Menu: React.FC = () => {
       <div className="flex flex-col sm:flex-row gap-3">
         <div className="flex-1">
           <Input
-            placeholder="Search menu items..."
+            placeholder="Buscar plato en el menú..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             icon={<Search className="w-5 h-5" />}
@@ -120,92 +122,74 @@ const Menu: React.FC = () => {
               className={`px-4 py-2 rounded-lg font-medium whitespace-nowrap transition-colors ${
                 categoryFilter === category
                   ? "bg-accent text-white"
-                  : "bg-white border border-border text-text-secondary hover:bg-bg-subtle"
+                  : "bg-white text-text-secondary border border-border hover:text-text"
               }`}
             >
-              {category === "all" ? "All Items" : category}
+              {category === "all" ? "Todos" : category}
             </button>
           ))}
         </div>
       </div>
 
-      {/* Menu Items */}
+      {/* Menu List */}
       {filteredItems.length === 0 ? (
         <Card className="text-center py-12">
           <Package className="w-16 h-16 text-text-secondary mx-auto mb-4 opacity-50" />
           <h3 className="text-xl font-semibold text-text mb-2">
-            No Menu Items Found
+            No se encontraron platos
           </h3>
-          <p className="text-text-secondary mb-4">
-            {searchTerm || categoryFilter !== "all"
-              ? "Try adjusting your filters"
-              : "Start by adding your first menu item"}
+          <p className="text-text-secondary">
+            Intenta ajustando tu búsqueda o agrega un nuevo platillo a tu carta.
           </p>
-          <Button
-            icon={<Plus className="w-5 h-5" />}
-            onClick={() => setShowAddModal(true)}
-          >
-            Add First Item
-          </Button>
         </Card>
       ) : (
-        <div className="grid gap-4">
+        <div className="grid md:grid-cols-2 gap-6">
           {filteredItems.map((item) => (
             <Card
               key={item.id}
-              className={`hover:shadow-lg transition-shadow ${
-                !item.is_available ? "opacity-60" : ""
+              className={`hover:shadow-lg transition-shadow relative overflow-hidden ${
+                !item.is_available ? "opacity-75 bg-bg-subtle" : ""
               }`}
             >
-              <div className="flex flex-col lg:flex-row gap-4">
+              <div className="flex gap-4">
                 {/* Image */}
-                {item.image_url && (
+                {item.image_url ? (
                   <img
                     src={item.image_url}
                     alt={item.name}
-                    className="w-full lg:w-32 h-32 object-cover rounded-lg"
+                    loading="lazy"
+                    width={96}
+                    height={96}
+                    className="w-24 h-24 rounded-lg object-cover"
                   />
+                ) : (
+                  <div className="w-24 h-24 rounded-lg bg-bg-subtle border flex items-center justify-center text-text-secondary">
+                    Sin foto
+                  </div>
                 )}
 
                 {/* Details */}
-                <div className="flex-1 space-y-2">
-                  <div className="flex items-start justify-between">
-                    <div>
-                      <div className="flex items-center space-x-2 mb-1">
-                        <h3 className="text-lg font-bold text-text">
-                          {item.name}
-                        </h3>
-                        <Badge
-                          variant={item.is_available ? "success" : "neutral"}
-                        >
-                          {item.is_available ? "Available" : "Unavailable"}
-                        </Badge>
-                      </div>
-                      {item.category && (
-                        <Badge variant="neutral" className="text-xs">
-                          {item.category}
-                        </Badge>
-                      )}
-                    </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-start justify-between mb-1">
+                    <h3 className="font-bold text-text truncate">{item.name}</h3>
+                    <Badge variant={item.is_available ? "success" : "neutral"}>
+                      {item.is_available ? "Disponible" : "Pausado"}
+                    </Badge>
                   </div>
-
-                  {item.description && (
-                    <p className="text-text-secondary text-sm">
-                      {item.description}
-                    </p>
-                  )}
-
-                  <div className="flex flex-wrap items-center gap-4 text-sm">
+                  <p className="text-sm text-text-secondary line-clamp-2 mb-2">
+                    {item.description || "Sin descripción."}
+                  </p>
+                  <div className="space-y-1 text-xs text-text-secondary">
                     <div>
-                      <span className="text-text-secondary">Base Price: </span>
-                      <span className="text-accent font-semibold text-lg">
+                      <span className="text-text-secondary">Precio Base: </span>
+                      <span className="text-accent font-semibold text-sm">
                         {formatCurrency(item.base_price)}
                       </span>
                     </div>
 
                     {item.sizes && item.sizes.length > 0 && (
                       <div>
-                        <span className="text-text-secondary">Sizes: </span>
+                        <span className="text-text-secondary">Tamaños: </span>
                         <span className="text-text">
                           {item.sizes.map((s) => s.name).join(", ")}
                         </span>
@@ -214,51 +198,51 @@ const Menu: React.FC = () => {
 
                     {item.addons && item.addons.length > 0 && (
                       <div>
-                        <span className="text-text-secondary">Add-ons: </span>
+                        <span className="text-text-secondary">Agregados: </span>
                         <span className="text-text">
-                          {item.addons.length} available
+                          {item.addons.length} disponibles
                         </span>
                       </div>
                     )}
                   </div>
                 </div>
+              </div>
 
-                {/* Actions */}
-                <div className="flex lg:flex-col gap-2 lg:min-w-[140px]">
-                  <Button
-                    size="sm"
-                    variant={item.is_available ? "outline" : "secondary"}
-                    icon={
-                      item.is_available ? (
-                        <EyeOff className="w-4 h-4" />
-                      ) : (
-                        <Eye className="w-4 h-4" />
-                      )
-                    }
-                    onClick={() => handleToggleAvailability(item)}
-                    fullWidth
-                  >
-                    {item.is_available ? "Mark Unavailable" : "Mark Available"}
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    icon={<Edit className="w-4 h-4" />}
-                    onClick={() => handleEdit(item)}
-                    fullWidth
-                  >
-                    Edit
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    icon={<Trash2 className="w-4 h-4" />}
-                    onClick={() => handleDelete(item)}
-                    fullWidth
-                  >
-                    Delete
-                  </Button>
-                </div>
+              {/* Actions */}
+              <div className="flex gap-2 mt-4 pt-4 border-t border-border">
+                <Button
+                  size="sm"
+                  variant={item.is_available ? "outline" : "secondary"}
+                  icon={
+                    item.is_available ? (
+                      <EyeOff className="w-4 h-4" />
+                    ) : (
+                      <Eye className="w-4 h-4" />
+                    )
+                  }
+                  onClick={() => handleToggleAvailability(item)}
+                  fullWidth
+                >
+                  {item.is_available ? "Desactivar" : "Activar"}
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  icon={<Edit className="w-4 h-4" />}
+                  onClick={() => handleEdit(item)}
+                  fullWidth
+                >
+                  Editar
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  icon={<Trash2 className="w-4 h-4 text-error" />}
+                  onClick={() => handleDelete(item)}
+                  fullWidth
+                >
+                  Eliminar
+                </Button>
               </div>
             </Card>
           ))}
@@ -356,13 +340,13 @@ const MenuItemModal: React.FC<MenuItemModalProps> = ({
     setError("");
 
     if (!formData.name || !formData.base_price) {
-      setError("Name and base price are required");
+      setError("El nombre y el precio base son obligatorios");
       return;
     }
 
-    const user = JSON.parse(localStorage.getItem("user") || "{}");
-    if (!user.restaurant_id) {
-      setError("Restaurant ID not found");
+    const user = getStoredUser();
+    if (!user?.restaurant_id) {
+      setError("No se encontró el ID del restaurante");
       return;
     }
 
@@ -392,7 +376,7 @@ const MenuItemModal: React.FC<MenuItemModalProps> = ({
     if (success) {
       onClose();
     } else {
-      setError(`Failed to ${mode} menu item`);
+      setError(`No se pudo ${mode === "add" ? "agregar" : "editar"} el plato`);
     }
   };
 
@@ -440,65 +424,63 @@ const MenuItemModal: React.FC<MenuItemModalProps> = ({
     <Modal
       isOpen={isOpen}
       onClose={onClose}
-      title={mode === "add" ? "Add Menu Item" : "Edit Menu Item"}
+      title={mode === "add" ? "Agregar Plato al Menú" : "Editar Plato"}
       size="lg"
     >
       <form onSubmit={handleSubmit} className="space-y-6">
         {error && <Alert type="error" message={error} />}
 
         <Input
-          label="Item Name"
+          label="Nombre del Plato"
           value={formData.name}
           onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-          placeholder="e.g., Margherita Pizza"
+          placeholder="Ej: Pizza Margherita"
           required
         />
 
         <Textarea
-          label="Description (Optional)"
+          label="Descripción (Opcional)"
           value={formData.description}
           onChange={(e) =>
             setFormData({ ...formData, description: e.target.value })
           }
-          placeholder="Describe your item..."
+          placeholder="Describe los ingredientes o preparación..."
           rows={2}
         />
 
         <div className="grid sm:grid-cols-2 gap-4">
           <Input
-            label="Category"
+            label="Categoría"
             value={formData.category}
             onChange={(e) =>
               setFormData({ ...formData, category: e.target.value })
             }
-            placeholder="e.g., Pizza, Burgers"
+            placeholder="Ej: Pizzas, Bebidas"
           />
 
           <Input
-            label="Base Price"
+            label="Precio Base"
             type="number"
-            step="0.01"
             value={formData.base_price}
             onChange={(e) =>
               setFormData({ ...formData, base_price: e.target.value })
             }
-            placeholder="0.00"
+            placeholder="0"
             required
           />
         </div>
 
-        <Input
-          label="Image URL (Optional)"
+        <ImageDropZone
           value={formData.image_url}
-          onChange={(e) =>
-            setFormData({ ...formData, image_url: e.target.value })
+          onChange={(base64) =>
+            setFormData({ ...formData, image_url: base64 })
           }
-          placeholder="https://example.com/image.jpg"
+          label="Foto del Plato (Arrastra o sube una imagen)"
         />
 
         {/* Sizes */}
         <div>
-          <label className="label mb-3">Sizes (Optional)</label>
+          <label className="label mb-3">Opciones de Tamaño (Opcional)</label>
           <div className="space-y-2 mb-3">
             {formData.sizes.map((size, index) => (
               <div
@@ -520,28 +502,27 @@ const MenuItemModal: React.FC<MenuItemModalProps> = ({
           </div>
           <div className="flex gap-2">
             <Input
-              placeholder="Size name"
+              placeholder="Nombre (Ej: Mediana)"
               value={newSize.name}
               onChange={(e) => setNewSize({ ...newSize, name: e.target.value })}
             />
             <Input
-              placeholder="Price"
+              placeholder="Precio"
               type="number"
-              step="0.01"
               value={newSize.price}
               onChange={(e) =>
                 setNewSize({ ...newSize, price: e.target.value })
               }
             />
             <Button type="button" onClick={addSize} variant="outline">
-              Add
+              Agregar
             </Button>
           </div>
         </div>
 
         {/* Add-ons */}
         <div>
-          <label className="label mb-3">Add-ons (Optional)</label>
+          <label className="label mb-3">Ingredientes Adicionales / Agregados (Opcional)</label>
           <div className="space-y-2 mb-3">
             {formData.addons.map((addon, index) => (
               <div
@@ -563,23 +544,22 @@ const MenuItemModal: React.FC<MenuItemModalProps> = ({
           </div>
           <div className="flex gap-2">
             <Input
-              placeholder="Add-on name"
+              placeholder="Agregado (Ej: Queso extra)"
               value={newAddon.name}
               onChange={(e) =>
                 setNewAddon({ ...newAddon, name: e.target.value })
               }
             />
             <Input
-              placeholder="Price"
+              placeholder="Precio extra"
               type="number"
-              step="0.01"
               value={newAddon.price}
               onChange={(e) =>
                 setNewAddon({ ...newAddon, price: e.target.value })
               }
             />
             <Button type="button" onClick={addAddon} variant="outline">
-              Add
+              Agregar
             </Button>
           </div>
         </div>
@@ -594,15 +574,15 @@ const MenuItemModal: React.FC<MenuItemModalProps> = ({
             }
             className="rounded border-border"
           />
-          <span className="text-text">Available for ordering</span>
+          <span className="text-text">Disponible para ordenar hoy</span>
         </label>
 
         <div className="flex gap-3">
           <Button type="button" variant="outline" onClick={onClose} fullWidth>
-            Cancel
+            Cancelar
           </Button>
           <Button type="submit" loading={loading} fullWidth>
-            {mode === "add" ? "Add Item" : "Save Changes"}
+            {mode === "add" ? "Agregar Plato" : "Guardar Cambios"}
           </Button>
         </div>
       </form>
@@ -635,16 +615,16 @@ const DeleteModal: React.FC<DeleteModalProps> = ({ isOpen, item, onClose }) => {
   if (!item) return null;
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose} title="Delete Menu Item" size="md">
+    <Modal isOpen={isOpen} onClose={onClose} title="Eliminar Plato del Menú" size="md">
       <div className="space-y-4">
         <Alert
           type="warning"
-          message={`Are you sure you want to delete "${item.name}"? This action cannot be undone.`}
+          message={`¿Estás seguro que deseas eliminar "${item.name}"? Esta acción no se puede deshacer y el plato se quitará de la carta.`}
         />
 
         <div className="flex gap-3">
           <Button variant="outline" onClick={onClose} fullWidth>
-            Cancel
+            Cancelar
           </Button>
           <Button
             variant="danger"
@@ -652,7 +632,7 @@ const DeleteModal: React.FC<DeleteModalProps> = ({ isOpen, item, onClose }) => {
             loading={loading}
             fullWidth
           >
-            Delete Item
+            Confirmar Eliminación
           </Button>
         </div>
       </div>

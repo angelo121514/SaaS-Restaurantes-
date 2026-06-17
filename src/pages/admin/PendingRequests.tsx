@@ -63,7 +63,7 @@ const PendingRequests: React.FC = () => {
   };
 
   if (loading) {
-    return <Loading text="Loading pending requests..." />;
+    return <Loading text="Cargando solicitudes pendientes..." />;
   }
 
   return (
@@ -72,14 +72,14 @@ const PendingRequests: React.FC = () => {
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-2xl font-bold text-text mb-2">
-            Pending Requests
+            Solicitudes Pendientes
           </h2>
           <p className="text-text-secondary">
-            Review and approve restaurant registrations
+            Revisa y aprueba las solicitudes de registro de nuevos restaurantes
           </p>
         </div>
         <Badge variant="warning" className="text-lg px-4 py-2">
-          {requests.length} Pending
+          {requests.length} Pendiente{requests.length !== 1 ? "s" : ""}
         </Badge>
       </div>
 
@@ -87,7 +87,7 @@ const PendingRequests: React.FC = () => {
       {requests.length > 0 && (
         <div className="flex items-center space-x-2 text-sm text-success">
           <div className="w-2 h-2 bg-success rounded-full animate-pulse" />
-          <span>Live updates enabled</span>
+          <span>Actualizaciones en tiempo real activas</span>
         </div>
       )}
 
@@ -96,10 +96,10 @@ const PendingRequests: React.FC = () => {
         <Card className="text-center py-12">
           <CheckCircle className="w-16 h-16 text-success mx-auto mb-4" />
           <h3 className="text-xl font-semibold text-text mb-2">
-            All Caught Up!
+            ¡Todo al día!
           </h3>
           <p className="text-text-secondary">
-            No pending registration requests at the moment.
+            No hay solicitudes de registro pendientes en este momento.
           </p>
         </Card>
       ) : (
@@ -170,13 +170,13 @@ const PendingRequests: React.FC = () => {
                     <div className="bg-bg-subtle rounded-lg p-3 space-y-2 text-sm">
                       {request.heard_from && (
                         <p className="text-text-secondary">
-                          <strong className="text-text">Heard from:</strong>{" "}
+                          <strong className="text-text">Cómo nos conoció:</strong>{" "}
                           {request.heard_from}
                         </p>
                       )}
                       {request.notes && (
                         <p className="text-text-secondary">
-                          <strong className="text-text">Notes:</strong>{" "}
+                          <strong className="text-text">Notas adicionales:</strong>{" "}
                           {request.notes}
                         </p>
                       )}
@@ -193,7 +193,7 @@ const PendingRequests: React.FC = () => {
                     icon={<CheckCircle className="w-4 h-4" />}
                     onClick={() => handleCreateAccount(request)}
                   >
-                    Approve
+                    Aprobar
                   </Button>
                   <Button
                     variant="outline"
@@ -202,7 +202,7 @@ const PendingRequests: React.FC = () => {
                     icon={<X className="w-4 h-4" />}
                     onClick={() => handleReject(request)}
                   >
-                    Reject
+                    Rechazar
                   </Button>
                 </div>
               </div>
@@ -267,7 +267,7 @@ const CreateAccountModal: React.FC<CreateAccountModalProps> = ({
   const [error, setError] = useState("");
   const [formData, setFormData] = useState({
     email: "",
-    subscriptionPlan: "free_trial",
+    subscriptionPlan: "pro", // Default to Pro as requested
     internalNotes: "",
     sendViaSMS: true,
     sendViaWhatsApp: true,
@@ -288,7 +288,7 @@ const CreateAccountModal: React.FC<CreateAccountModalProps> = ({
     setError("");
 
     if (!formData.email) {
-      setError("Email is required");
+      setError("El correo es obligatorio");
       return;
     }
 
@@ -303,10 +303,11 @@ const CreateAccountModal: React.FC<CreateAccountModalProps> = ({
 
     setLoading(false);
 
-    if (result.success && result.credentials) {
-      onSuccess(result.credentials);
+    if (result.success && (result.credentials || result.invite)) {
+      // En Auth real solo hay `invite`; en mock hay `credentials`.
+      onSuccess(result.invite ? { invite: result.invite, email: result.invite.email } : result.credentials);
     } else {
-      setError(result.error || "Failed to create account");
+      setError(result.error || "No se pudo crear la cuenta");
     }
   };
 
@@ -316,7 +317,7 @@ const CreateAccountModal: React.FC<CreateAccountModalProps> = ({
     <Modal
       isOpen={isOpen}
       onClose={onClose}
-      title="Create Restaurant Account"
+      title="Crear Cuenta de Restaurante"
       size="lg"
     >
       <form onSubmit={handleSubmit} className="space-y-6">
@@ -324,36 +325,36 @@ const CreateAccountModal: React.FC<CreateAccountModalProps> = ({
 
         {/* Restaurant Info */}
         <div className="bg-bg-subtle rounded-lg p-4">
-          <h4 className="font-semibold text-text mb-2">Restaurant Details</h4>
+          <h4 className="font-semibold text-text mb-2">Detalles del Local</h4>
           <div className="space-y-1 text-sm">
             <p className="text-text">
-              <strong>Name:</strong> {request.restaurant_name}
+              <strong>Nombre:</strong> {request.restaurant_name}
             </p>
             <p className="text-text-secondary">
-              <strong>Owner:</strong> {request.owner_name}
+              <strong>Dueño:</strong> {request.owner_name}
             </p>
             <p className="text-text-secondary">
-              <strong>Phone:</strong> {request.phone}
+              <strong>Teléfono:</strong> {request.phone}
             </p>
             <p className="text-text-secondary">
-              <strong>City:</strong> {request.city}
+              <strong>Ciudad:</strong> {request.city}
             </p>
           </div>
         </div>
 
         {/* Account Details */}
         <Input
-          label="Email Address"
+          label="Dirección de Correo Electrónico"
           type="email"
           value={formData.email}
           onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-          placeholder="owner@restaurant.com"
+          placeholder="dueño@restaurante.com"
           required
-          helperText="This will be used for login"
+          helperText="Este correo se utilizará para iniciar sesión"
         />
 
         <Select
-          label="Subscription Plan"
+          label="Plan de Suscripción"
           value={formData.subscriptionPlan}
           onChange={(e) =>
             setFormData({ ...formData, subscriptionPlan: e.target.value })
@@ -365,18 +366,18 @@ const CreateAccountModal: React.FC<CreateAccountModalProps> = ({
         />
 
         <Textarea
-          label="Internal Notes (Optional)"
+          label="Notas Internas (Opcional)"
           value={formData.internalNotes}
           onChange={(e) =>
             setFormData({ ...formData, internalNotes: e.target.value })
           }
-          placeholder="Add any internal notes..."
+          placeholder="Agregar comentarios internos..."
           rows={2}
         />
 
         {/* Send Credentials Via */}
         <div>
-          <label className="label mb-3">Send Credentials Via</label>
+          <label className="label mb-3">Enviar Credenciales Por</label>
           <div className="space-y-2">
             <label className="flex items-center space-x-2 cursor-pointer">
               <input
@@ -421,18 +422,17 @@ const CreateAccountModal: React.FC<CreateAccountModalProps> = ({
         <div className="bg-accent-secondary/10 border border-accent-secondary/20 rounded-lg p-3 text-sm">
           <AlertCircle className="w-4 h-4 text-accent-secondary inline mr-2" />
           <span className="text-text-secondary">
-            A temporary password will be generated and sent to the restaurant.
-            They can change it after first login.
+            Se generará automáticamente una contraseña provisoria y se le enviará al restaurante. Podrán cambiarla tras su primer ingreso.
           </span>
         </div>
 
         {/* Actions */}
         <div className="flex gap-3">
           <Button type="button" variant="outline" onClick={onClose} fullWidth>
-            Cancel
+            Cancelar
           </Button>
           <Button type="submit" loading={loading} fullWidth>
-            Create Account & Send Credentials
+            Crear Cuenta y Enviar Accesos
           </Button>
         </div>
       </form>
@@ -458,7 +458,7 @@ const RejectModal: React.FC<RejectModalProps> = ({
 
   const handleReject = async () => {
     if (!reason.trim()) {
-      setError("Please provide a reason for rejection");
+      setError("Por favor detalla un motivo de rechazo");
       return;
     }
 
@@ -472,7 +472,7 @@ const RejectModal: React.FC<RejectModalProps> = ({
       onClose();
       setReason("");
     } else {
-      setError("Failed to reject request");
+      setError("Error al rechazar la solicitud");
     }
   };
 
@@ -482,32 +482,32 @@ const RejectModal: React.FC<RejectModalProps> = ({
     <Modal
       isOpen={isOpen}
       onClose={onClose}
-      title="Reject Registration"
+      title="Rechazar Registro"
       size="md"
     >
       <div className="space-y-4">
         {error && <Alert type="error" message={error} />}
 
         <p className="text-text-secondary">
-          Are you sure you want to reject the registration for{" "}
+          ¿Estás seguro que deseas rechazar la solicitud de registro para{" "}
           <strong className="text-text">{request.restaurant_name}</strong>?
         </p>
 
         <Textarea
-          label="Reason for Rejection"
+          label="Motivo del Rechazo"
           value={reason}
           onChange={(e) => {
             setReason(e.target.value);
             setError("");
           }}
-          placeholder="Please provide a reason..."
+          placeholder="Escribe el motivo..."
           required
           rows={3}
         />
 
         <div className="flex gap-3">
           <Button type="button" variant="outline" onClick={onClose} fullWidth>
-            Cancel
+            Cancelar
           </Button>
           <Button
             variant="danger"
@@ -515,7 +515,7 @@ const RejectModal: React.FC<RejectModalProps> = ({
             loading={loading}
             fullWidth
           >
-            Reject Registration
+            Confirmar Rechazo
           </Button>
         </div>
       </div>
@@ -523,7 +523,7 @@ const RejectModal: React.FC<RejectModalProps> = ({
   );
 };
 
-// Credentials Display Modal
+// Credentials / Invitation Display Modal
 interface CredentialsModalProps {
   isOpen: boolean;
   credentials: any;
@@ -537,12 +537,23 @@ const CredentialsModal: React.FC<CredentialsModalProps> = ({
 }) => {
   const [copied, setCopied] = useState(false);
 
+  // Modo Auth real: solo hay `invite` (sin contraseña).
+  const isInvite = !!credentials?.invite;
+  const invite = credentials?.invite;
+
   const handleCopy = async () => {
-    const text = `Login Credentials:\n\nEmail: ${credentials?.email}\nPassword: ${credentials?.password}\nLogin URL: ${credentials?.loginUrl}`;
+    let text: string;
+    if (isInvite) {
+      text = `Acceso a CMOR FLOW:\n\nHemos enviado una invitación a ${invite.email}.\nEl dueño recibirá un enlace por correo para definir su contraseña y acceder.`;
+    } else {
+      text = `Credenciales de Acceso:\n\nCorreo: ${credentials?.email}\nContraseña: ${credentials?.password}\nEnlace de acceso: ${credentials?.loginUrl}`;
+    }
     const success = await copyToClipboard(text);
     if (success) {
       setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
+      // Limpiar el timer al desmontar para evitar setState tras unmount.
+      const t = setTimeout(() => setCopied(false), 2000);
+      return () => clearTimeout(t);
     }
   };
 
@@ -552,42 +563,59 @@ const CredentialsModal: React.FC<CredentialsModalProps> = ({
     <Modal
       isOpen={isOpen}
       onClose={onClose}
-      title="Account Created Successfully!"
+      title="¡Cuenta Creada Exitosamente!"
       size="md"
     >
       <div className="space-y-6">
         {/* Success Message */}
-        <div className="text-center">
+        <div className="text-center flex flex-col items-center">
           <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-success/10 mb-4">
             <CheckCircle className="w-10 h-10 text-success" />
           </div>
           <p className="text-text-secondary">
-            Restaurant account has been created and credentials have been sent.
+            {isInvite
+              ? "La cuenta del restaurante ha sido configurada y la invitación ha sido enviada por correo."
+              : "La cuenta del restaurante ha sido configurada y los accesos han sido despachados."}
           </p>
         </div>
 
-        {/* Credentials */}
+        {/* Credentials / Invitation */}
         <div className="bg-bg-subtle rounded-lg p-4 space-y-3">
-          <h4 className="font-semibold text-text mb-3">Login Credentials</h4>
+          <h4 className="font-semibold text-text mb-3">
+            {isInvite ? "Invitación" : "Datos de Ingreso"}
+          </h4>
           <div className="space-y-2">
             <div>
-              <label className="text-xs text-text-secondary">Email</label>
-              <p className="font-mono text-text">{credentials.email}</p>
-            </div>
-            <div>
-              <label className="text-xs text-text-secondary">
-                Temporary Password
-              </label>
-              <p className="font-mono text-text font-bold">
-                {credentials.password}
+              <label className="text-xs text-text-secondary">Correo</label>
+              <p className="font-mono text-text">
+                {isInvite ? invite.email : credentials.email}
               </p>
             </div>
-            <div>
-              <label className="text-xs text-text-secondary">Login URL</label>
-              <p className="font-mono text-text text-sm break-all">
-                {credentials.loginUrl}
-              </p>
-            </div>
+            {isInvite ? (
+              <div>
+                <label className="text-xs text-text-secondary">Estado</label>
+                <p className="text-text font-medium">
+                  {invite.message || "Invitación enviada por correo."}
+                </p>
+              </div>
+            ) : (
+              <>
+                <div>
+                  <label className="text-xs text-text-secondary">
+                    Contraseña Temporal
+                  </label>
+                  <p className="font-mono text-text font-bold">
+                    {credentials.password}
+                  </p>
+                </div>
+                <div>
+                  <label className="text-xs text-text-secondary">URL de Acceso</label>
+                  <p className="font-mono text-text text-sm break-all">
+                    {credentials.loginUrl}
+                  </p>
+                </div>
+              </>
+            )}
           </div>
         </div>
 
@@ -598,20 +626,19 @@ const CredentialsModal: React.FC<CredentialsModalProps> = ({
           icon={<Copy className="w-4 h-4" />}
           onClick={handleCopy}
         >
-          {copied ? "Copied!" : "Copy All Credentials"}
+          {copied ? "¡Copiado!" : "Copiar Todas las Credenciales"}
         </Button>
 
         {/* Info */}
         <div className="bg-accent-secondary/10 border border-accent-secondary/20 rounded-lg p-3 text-sm">
           <AlertCircle className="w-4 h-4 text-accent-secondary inline mr-2" />
           <span className="text-text-secondary">
-            These credentials have been sent to the restaurant via their
-            selected channels (SMS/WhatsApp/Email).
+            Se ha enviado un aviso de forma directa al dueño utilizando los canales seleccionados (SMS/WhatsApp/Email).
           </span>
         </div>
 
         <Button onClick={onClose} fullWidth>
-          Done
+          Finalizar
         </Button>
       </div>
     </Modal>

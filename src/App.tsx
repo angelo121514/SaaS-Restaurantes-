@@ -1,47 +1,74 @@
-import React from "react";
+import React, { Suspense, lazy } from "react";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 
-// Public pages
+// Public pages — loaded eagerly (tiny, on the critical path for first paint)
 import LandingPage from "./pages/public/LandingPage";
-import RegisterPage from "./pages/public/RegisterPage";
-import LoginPage from "./pages/public/LoginPage";
+import RequireRole from "./components/RequireRole";
 
-// Restaurant dashboard
-import RestaurantDashboard from "./pages/restaurant/Dashboard";
+// Feature-level code splitting: each area below ships in its own chunk,
+// so a customer on /menu/:slug no longer downloads the admin panel,
+// POS, CRM, AI or auth pages.
+const RegisterPage = lazy(() => import("./pages/public/RegisterPage"));
+const LoginPage = lazy(() => import("./pages/public/LoginPage"));
+const SetupPassword = lazy(() => import("./pages/public/SetupPassword"));
 
-// Admin panel
-import AdminLogin from "./pages/admin/LoginPage";
-import AdminDashboard from "./pages/admin/Dashboard";
+const RestaurantDashboard = lazy(() => import("./pages/restaurant/Dashboard"));
+const AdminLogin = lazy(() => import("./pages/admin/LoginPage"));
+const AdminDashboard = lazy(() => import("./pages/admin/Dashboard"));
 
-// Customer ordering
-import CustomerMenu from "./pages/customer/CustomerMenu";
+const CustomerMenu = lazy(() => import("./pages/customer/CustomerMenu"));
+const NotFoundPage = lazy(() => import("./pages/NotFoundPage"));
 
-// 404
-import NotFoundPage from "./pages/NotFoundPage";
+// Lightweight fallback shown while a lazy route resolves its chunk.
+const RouteFallback: React.FC = () => (
+  <div className="min-h-screen flex items-center justify-center bg-bg">
+    <div className="flex flex-col items-center gap-3">
+      <div className="w-8 h-8 border-2 border-accent border-t-transparent rounded-full animate-spin" />
+      <span className="text-text-secondary text-sm">Cargando…</span>
+    </div>
+  </div>
+);
 
 function App() {
   return (
     <BrowserRouter>
-      <Routes>
-        {/* Public Routes */}
-        <Route path="/" element={<LandingPage />} />
-        <Route path="/register" element={<RegisterPage />} />
-        <Route path="/login" element={<LoginPage />} />
+      <Suspense fallback={<RouteFallback />}>
+        <Routes>
+          {/* Public Routes */}
+          <Route path="/" element={<LandingPage />} />
+          <Route path="/register" element={<RegisterPage />} />
+          <Route path="/login" element={<LoginPage />} />
+          <Route path="/setup-password" element={<SetupPassword />} />
 
-        {/* Restaurant Dashboard Routes */}
-        <Route path="/restaurant/*" element={<RestaurantDashboard />} />
+          {/* Restaurant Dashboard Routes */}
+          <Route
+            path="/restaurant/*"
+            element={
+              <RequireRole role="owner">
+                <RestaurantDashboard />
+              </RequireRole>
+            }
+          />
 
-        {/* Admin Panel Routes */}
-        <Route path="/admin/login" element={<AdminLogin />} />
-        <Route path="/admin/*" element={<AdminDashboard />} />
+          {/* Admin Panel Routes */}
+          <Route path="/admin/login" element={<AdminLogin />} />
+          <Route
+            path="/admin/*"
+            element={
+              <RequireRole role="admin" redirectTo="/admin/login">
+                <AdminDashboard />
+              </RequireRole>
+            }
+          />
 
-        {/* Customer Ordering Route */}
-        <Route path="/menu/:slug" element={<CustomerMenu />} />
+          {/* Customer Ordering Route */}
+          <Route path="/menu/:slug" element={<CustomerMenu />} />
 
-        {/* 404 */}
-        <Route path="/404" element={<NotFoundPage />} />
-        <Route path="*" element={<Navigate to="/404" replace />} />
-      </Routes>
+          {/* 404 */}
+          <Route path="/404" element={<NotFoundPage />} />
+          <Route path="*" element={<Navigate to="/404" replace />} />
+        </Routes>
+      </Suspense>
     </BrowserRouter>
   );
 }

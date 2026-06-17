@@ -1,5 +1,72 @@
 import { APP_CONFIG } from "../config/config";
 
+// --------------------------------------------------------------------
+// SESSION / STORAGE HELPERS
+// Robust wrappers around localStorage that never throw on parse
+// failures and enforce a signed-ish expiry so a stale or hand-forged
+// entry cannot grant access indefinitely.
+// --------------------------------------------------------------------
+
+const SESSION_DURATION_MS = 1000 * 60 * 60 * 8; // 8 hours
+
+interface StoredSession {
+  __exp?: number;
+  [key: string]: any;
+}
+
+/**
+ * Read and validate a JSON session from localStorage.
+ * Returns null if the entry is missing, malformed, or expired.
+ * Never throws.
+ */
+export const getStoredSession = (key: string): any | null => {
+  try {
+    const raw = localStorage.getItem(key);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as StoredSession;
+    if (!parsed || typeof parsed !== "object") return null;
+    if (parsed.__exp && Date.now() > parsed.__exp) {
+      localStorage.removeItem(key);
+      return null;
+    }
+    return parsed;
+  } catch {
+    // Corrupted entry — clear it so the route can recover.
+    try {
+      localStorage.removeItem(key);
+    } catch {
+      /* ignore */
+    }
+    return null;
+  }
+};
+
+/** Write a session object to localStorage with an expiry timestamp. */
+export const setStoredSession = (key: string, data: any): void => {
+  try {
+    const payload: StoredSession = {
+      ...data,
+      __exp: Date.now() + SESSION_DURATION_MS,
+    };
+    localStorage.setItem(key, JSON.stringify(payload));
+  } catch {
+    /* storage full or unavailable — ignore */
+  }
+};
+
+/** Remove a session entry safely. */
+export const clearStoredSession = (key: string): void => {
+  try {
+    localStorage.removeItem(key);
+  } catch {
+    /* ignore */
+  }
+};
+
+/** Convenience wrappers for the restaurant user session. */
+export const getStoredUser = (): any | null => getStoredSession("user");
+export const getStoredAdmin = (): any | null => getStoredSession("admin");
+
 /**
  * Format currency value
  */

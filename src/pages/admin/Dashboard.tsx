@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React from "react";
 import {
   useNavigate,
   Routes,
@@ -7,7 +7,6 @@ import {
   useLocation,
 } from "react-router-dom";
 import {
-  Shield,
   LogOut,
   LayoutDashboard,
   FileText,
@@ -18,33 +17,33 @@ import DashboardHome from "./DashboardHome";
 import PendingRequests from "./PendingRequests";
 import AllRestaurants from "./AllRestaurants";
 import Analytics from "./Analytics";
+import { CmorFlowLogo } from "../../components/CmorFlowLogo";
+import { supabase } from "../../config/authClient";
+import { useAuth } from "../../hooks/useAuth";
 
 const AdminDashboard: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
-  const [admin, setAdmin] = useState<any>(null);
+  const { user, profile, loading } = useAuth();
 
-  useEffect(() => {
-    const adminData = localStorage.getItem("admin");
-    if (!adminData) {
-      navigate("/admin/login");
-    } else {
-      setAdmin(JSON.parse(adminData));
-    }
-  }, [navigate]);
-
-  const handleLogout = () => {
-    localStorage.removeItem("admin");
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
+    const { clearStoredSession } = await import("../../utils/helpers");
+    clearStoredSession("admin");
     navigate("/admin/login");
   };
+
+  if (loading || !user) return null;
+
+  const admin = { email: user.email, name: profile?.display_name };
 
   if (!admin) return null;
 
   const navItems = [
-    { path: "/admin", icon: LayoutDashboard, label: "Dashboard" },
-    { path: "/admin/requests", icon: FileText, label: "Pending Requests" },
-    { path: "/admin/restaurants", icon: StoreIcon, label: "All Restaurants" },
-    { path: "/admin/analytics", icon: BarChart3, label: "Analytics" },
+    { path: "/admin", icon: LayoutDashboard, label: "Resumen (Dashboard)" },
+    { path: "/admin/requests", icon: FileText, label: "Solicitudes Pendientes" },
+    { path: "/admin/restaurants", icon: StoreIcon, label: "Restaurantes Activos" },
+    { path: "/admin/analytics", icon: BarChart3, label: "Métricas Globales" },
   ];
 
   return (
@@ -53,10 +52,10 @@ const AdminDashboard: React.FC = () => {
       <nav className="bg-white border-b border-border sticky top-0 z-40">
         <div className="container-custom">
           <div className="flex items-center justify-between h-16">
-            <div className="flex items-center space-x-3">
-              <Shield className="w-8 h-8 text-accent" />
+            <div className="flex items-center space-x-4">
+              <CmorFlowLogo size="sm" showText={false} />
               <div>
-                <h1 className="text-lg font-bold text-text">Admin Panel</h1>
+                <h1 className="text-md font-bold text-text">Consola Admin CMOR FLOW</h1>
                 <p className="text-xs text-text-secondary">{admin.email}</p>
               </div>
             </div>
@@ -65,7 +64,7 @@ const AdminDashboard: React.FC = () => {
               className="flex items-center space-x-2 text-text-secondary hover:text-error transition-colors"
             >
               <LogOut className="w-5 h-5" />
-              <span>Logout</span>
+              <span>Cerrar Sesión</span>
             </button>
           </div>
         </div>
@@ -105,6 +104,11 @@ const AdminDashboard: React.FC = () => {
           <Route path="analytics" element={<Analytics />} />
         </Routes>
       </div>
+
+      {/* Footer Branding */}
+      <footer className="py-6 border-t border-border mt-12 text-center text-xs text-text-secondary">
+        SaaS de Pedidos QR y Gestión — Potenciado por CMOR FLOW
+      </footer>
     </div>
   );
 };

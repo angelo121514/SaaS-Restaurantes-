@@ -3,12 +3,40 @@
 @tailwind utilities;
 
 @layer base {
+  :root {
+    --color-bg: 255 255 255;
+    --color-bg-subtle: 250 250 250;
+    --color-text: 10 10 10;
+    --color-text-secondary: 107 107 107;
+    --color-accent: 0 0 0;
+    --color-accent-secondary: 99 102 241;
+    --color-border: 229 229 229;
+    --logo-dark: #121212;
+    --logo-silver: #b4b4b2;
+    --logo-light: #f9f7e9;
+  }
+
+  .dark {
+    --color-bg: 9 13 22;
+    --color-bg-subtle: 18 24 36;
+    --color-text: 244 244 245;
+    --color-text-secondary: 161 161 170;
+    --color-accent: 220 38 38;
+    --color-accent-secondary: 239 68 68;
+    --color-border: 39 39 42;
+    --logo-dark: #ffffff;
+    --logo-silver: #475569;
+    --logo-light: rgb(var(--color-bg));
+  }
+
   * {
-    @apply border-border;
+    border-color: rgb(var(--color-border));
   }
 
   body {
-    @apply bg-bg text-text font-sans antialiased;
+    background-color: rgb(var(--color-bg));
+    color: rgb(var(--color-text));
+    @apply font-sans antialiased transition-colors duration-200;
     margin: 0;
     min-height: 100vh;
   }
@@ -38,7 +66,7 @@
 
   /* Input styles */
   .input {
-    @apply w-full rounded-lg border border-border bg-white px-4 py-3 text-base text-text placeholder:text-text-secondary focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent transition-all duration-200;
+    @apply w-full rounded-lg border border-border bg-bg px-4 py-3 text-base text-text placeholder:text-text-secondary focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent transition-all duration-200;
   }
 
   .label {
@@ -47,7 +75,7 @@
 
   /* Card styles */
   .card {
-    @apply bg-white rounded-lg border border-border p-6 transition-all duration-200;
+    @apply bg-bg rounded-lg border border-border p-6 transition-all duration-200;
   }
 
   .card-hover {
@@ -103,15 +131,3 @@ button:focus-visible {
   outline: 4px auto -webkit-focus-ring-color;
 }
 
-@media (prefers-color-scheme: light) {
-  :root {
-    color: #213547;
-    background-color: #ffffff;
-  }
-  a:hover {
-    color: #747bff;
-  }
-  button {
-    background-color: #f9f9f9;
-  }
-}

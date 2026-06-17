@@ -7,8 +7,8 @@ const Analytics: React.FC = () => {
     <div className="space-y-6">
       {/* Header */}
       <div>
-        <h2 className="text-2xl font-bold text-text mb-2">Analytics</h2>
-        <p className="text-text-secondary">Platform performance and insights</p>
+        <h2 className="text-2xl font-bold text-text mb-2">Métricas Globales (Analytics)</h2>
+        <p className="text-text-secondary">Rendimiento e informes de la plataforma SaaS</p>
       </div>
 
       {/* Coming Soon */}
@@ -21,20 +21,20 @@ const Analytics: React.FC = () => {
             <Users className="w-12 h-12 text-warning opacity-50" />
           </div>
           <h3 className="text-2xl font-bold text-text mb-3">
-            Analytics Dashboard Coming Soon
+            Panel de Estadísticas Avanzadas próximamente
           </h3>
           <p className="text-text-secondary text-lg mb-6">
-            Advanced reporting and insights are under development.
+            Las estadísticas avanzadas de transacciones, uso y facturación están en desarrollo.
           </p>
           <div className="bg-bg-subtle rounded-lg p-6 text-left">
-            <h4 className="font-semibold text-text mb-3">Planned Features:</h4>
+            <h4 className="font-semibold text-text mb-3">Características Planificadas:</h4>
             <ul className="space-y-2 text-text-secondary">
-              <li>• Revenue trends and forecasting</li>
-              <li>• Restaurant performance comparison</li>
-              <li>• Order analytics and peak hours</li>
-              <li>• Customer behavior insights</li>
-              <li>• Subscription metrics and churn analysis</li>
-              <li>• Export reports (PDF/Excel)</li>
+              <li>• Tendencias de ingresos de la red y proyecciones de cobros</li>
+              <li>• Comparativa de rendimiento entre restaurantes y sucursales</li>
+              <li>• Volumen de órdenes por hora y horas peak</li>
+              <li>• Hábitos de consumo y recurrencia de comensales</li>
+              <li>• Métricas de suscripción (MRR, LTV, Tasa de abandono)</li>
+              <li>• Descarga de reportes integrales en formatos PDF y Excel</li>
             </ul>
           </div>
         </div>
