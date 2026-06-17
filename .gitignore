@@ -20,6 +20,9 @@ dist-ssr
 # MCP config local (cada dev usa su propia config / OAuth)
 .mcp.json
 
+# Notas locales (referencias internas del proyecto)
+NOTAS.md
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json
