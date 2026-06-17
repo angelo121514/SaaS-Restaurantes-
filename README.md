@@ -40,7 +40,7 @@ Ya hecho: https://github.com/angelo121514/SaaS-Restaurantes-
 
    | Name | Value |
    |---|---|
-   | `VITE_SUPABASE_URL` | `https://wirwadxtrbrslfwayple.supabase.co` |
+   | `VITE_SUPABASE_URL` | `https://clsgoknzyhkxtogxoshz.supabase.co` |
    | `VITE_SUPABASE_ANON_KEY` | (tu anon key pública de Supabase) |
 
 7. **Deploy** → en ~1 min tienes `https://<tu-proyecto>.vercel.app`
