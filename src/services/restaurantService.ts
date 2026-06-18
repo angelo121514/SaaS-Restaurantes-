@@ -1,5 +1,5 @@
 import { supabase } from "../config/supabase";
-import type { Order, MenuItem } from "../config/supabase";
+import type { Order, MenuItem, Customer } from "../config/supabase";
 
 /**
  * Restaurant API Service
@@ -154,7 +154,9 @@ export const deleteMenuItem = async (itemId: string) => {
 export const createOrder = async (order: Partial<Order>) => {
   const { data, error } = await supabase
     .from("orders")
-    .insert([order]);
+    .insert([order])
+    .select()
+    .single();
 
   return { data, error };
 };
@@ -208,4 +210,60 @@ export const getRestaurantStats = async (restaurantId: string) => {
       totalOrders: 0,
     };
   }
+};
+
+// --- Customer & CRM Service Functions ---
+
+// Get all customers for a restaurant
+export const getCustomers = async (restaurantId: string) => {
+  const { data, error } = await supabase
+    .from("restaurant_customers")
+    .select("*, orders(*)")
+    .eq("restaurant_id", restaurantId)
+    .order("created_at", { ascending: false });
+
+  if (error) {
+    console.error("Error fetching customers:", error);
+    return [];
+  }
+  return data as any[];
+};
+
+// Create a new customer
+export const createCustomer = async (customer: Partial<Customer>) => {
+  const { data, error } = await supabase
+    .from("restaurant_customers")
+    .insert([customer])
+    .select()
+    .single();
+
+  return { data: data as Customer | null, error };
+};
+
+// Update customer details (e.g. notes)
+export const updateCustomer = async (customerId: string, updates: Partial<Customer>) => {
+  const { data, error } = await supabase
+    .from("restaurant_customers")
+    .update(updates)
+    .eq("id", customerId)
+    .select()
+    .single();
+
+  return { data: data as Customer | null, error };
+};
+
+// Get last 3 orders for a customer
+export const getCustomerOrders = async (customerId: string, limit = 3) => {
+  const { data, error } = await supabase
+    .from("orders")
+    .select("*")
+    .eq("customer_id", customerId)
+    .order("created_at", { ascending: false })
+    .limit(limit);
+
+  if (error) {
+    console.error("Error fetching customer orders:", error);
+    return [];
+  }
+  return data as Order[];
 };

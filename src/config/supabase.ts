@@ -68,9 +68,21 @@ export interface MenuItem {
   created_at: string;
 }
 
+export interface Customer {
+  id: string;
+  restaurant_id: string;
+  name: string;
+  phone: string;
+  email?: string;
+  notes?: string;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface Order {
   id: string;
   restaurant_id: string;
+  customer_id?: string;
   order_number: string;
   order_type: "qr" | "counter" | "phone" | "table";
   table_number?: string;
@@ -323,15 +335,59 @@ class MockSupabaseClient {
             created_at: new Date().toISOString(),
           },
         ];
+      case "restaurant_customers":
+        return [
+          {
+            id: "cust-1",
+            restaurant_id: "demo-restaurant-id",
+            name: "Tomás Silva",
+            phone: "+56 9 8765 4321",
+            email: "tomas.silva@email.cl",
+            notes: "Prefiere salsa extra y masa delgada. Cliente muy recurrente de los fines de semana.",
+            created_at: new Date(Date.now() - 86400000 * 30).toISOString(),
+            updated_at: new Date().toISOString(),
+          },
+          {
+            id: "cust-2",
+            restaurant_id: "demo-restaurant-id",
+            name: "Camila Gómez",
+            phone: "+56 9 7654 3210",
+            email: "camila.g@email.com",
+            notes: "Vegetariana estricta. Alérgica a las nueces.",
+            created_at: new Date(Date.now() - 86400000 * 15).toISOString(),
+            updated_at: new Date().toISOString(),
+          },
+          {
+            id: "cust-3",
+            restaurant_id: "demo-restaurant-id",
+            name: "Andrés Muñoz",
+            phone: "+56 9 6543 2109",
+            email: "andres.m@gmail.com",
+            notes: "Suele venir a trabajar por las tardes. Siempre pide mesa cerca de un enchufe.",
+            created_at: new Date(Date.now() - 86400000 * 10).toISOString(),
+            updated_at: new Date().toISOString(),
+          },
+          {
+            id: "cust-4",
+            restaurant_id: "demo-restaurant-id",
+            name: "Sofía Rojas",
+            phone: "+56 9 5432 1098",
+            notes: "Pide principalmente para llevar.",
+            created_at: new Date(Date.now() - 86400000 * 5).toISOString(),
+            updated_at: new Date().toISOString(),
+          },
+        ];
       case "orders":
         return [
           {
             id: "order-uuid-1",
             restaurant_id: "demo-restaurant-id",
+            customer_id: "cust-3",
             order_number: "PED8765432",
             order_type: "qr",
             table_number: "Mesa 4",
-            customer_phone: "999988887",
+            customer_name: "Andrés Muñoz",
+            customer_phone: "+56 9 6543 2109",
             items: [
               {
                 menu_item_id: "menu-item-1",
@@ -353,17 +409,20 @@ class MockSupabaseClient {
             subtotal: 19000,
             tax: 3610,
             total: 22610,
-            status: "pending",
-            payment_method: "Transferencia",
-            created_at: new Date().toISOString(),
+            status: "completed",
+            payment_method: "cash",
+            payment_status: "paid",
+            created_at: new Date(Date.now() - 3600000 * 24).toISOString(),
           },
           {
             id: "order-uuid-2",
             restaurant_id: "demo-restaurant-id",
+            customer_id: "cust-2",
             order_number: "PED8765431",
             order_type: "qr",
             table_number: "Mesa 1",
-            customer_phone: "999911112",
+            customer_name: "Camila Gómez",
+            customer_phone: "+56 9 7654 3210",
             items: [
               {
                 menu_item_id: "menu-item-2",
@@ -378,8 +437,9 @@ class MockSupabaseClient {
             tax: 2546,
             total: 15946,
             status: "completed",
-            payment_method: "Efectivo",
-            created_at: new Date(Date.now() - 3600000).toISOString(),
+            payment_method: "card",
+            payment_status: "paid",
+            created_at: new Date(Date.now() - 3600000 * 2).toISOString(),
           },
         ];
       default:

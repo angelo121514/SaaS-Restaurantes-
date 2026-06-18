@@ -1,6 +1,8 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Users, Phone, Mail, FileText, Plus, Search, Heart, User, Clock } from "lucide-react";
 import { Card, Button, Input, Badge, Modal, Textarea } from "../../components/ui";
+import { getCustomers, updateCustomer } from "../../services/restaurantService";
+import { useRestaurantId } from "../../hooks/useAuth";
 
 interface Customer {
   id: string;
@@ -19,52 +21,71 @@ export const Crm: React.FC = () => {
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
   const [showAddNoteModal, setShowAddNoteModal] = useState(false);
   const [noteText, setNoteText] = useState("");
+  const [customers, setCustomers] = useState<Customer[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  const [customers, setCustomers] = useState<Customer[]>([
-    {
-      id: "cust-1",
-      name: "Tomás Silva",
-      phone: "+56 9 8765 4321",
-      email: "tomas.silva@email.cl",
-      totalOrders: 14,
-      totalSpent: 135400,
-      lastVisit: "Ayer, 20:30",
-      favoriteDish: "Pizza Margherita",
-      notes: "Prefiere salsa extra y masa delgada. Cliente muy recurrente de los fines de semana.",
-    },
-    {
-      id: "cust-2",
-      name: "Camila Gómez",
-      phone: "+56 9 7654 3210",
-      email: "camila.g@email.com",
-      totalOrders: 8,
-      totalSpent: 72800,
-      lastVisit: "Hace 3 días, 14:15",
-      favoriteDish: "Hamburguesa Vegana Crujiente",
-      notes: "Vegetariana estricta. Alérgica a las nueces.",
-    },
-    {
-      id: "cust-3",
-      name: "Andrés Muñoz",
-      phone: "+56 9 6543 2109",
-      email: "andres.m@gmail.com",
-      totalOrders: 5,
-      totalSpent: 42500,
-      lastVisit: "12 de Junio, 13:00",
-      favoriteDish: "Macchiato de Caramelo Helado",
-      notes: "Suele venir a trabajar por las tardes. Siempre pide mesa cerca de un enchufe.",
-    },
-    {
-      id: "cust-4",
-      name: "Sofía Rojas",
-      phone: "+56 9 5432 1098",
-      totalOrders: 3,
-      totalSpent: 19500,
-      lastVisit: "10 de Junio, 21:10",
-      favoriteDish: "Bastones de Pan de Ajo",
-      notes: "Pide principalmente para llevar.",
-    },
-  ]);
+  const restaurantId = useRestaurantId();
+
+  const loadCrmData = async () => {
+    if (!restaurantId) return;
+    setLoading(true);
+    const dbCustomers = await getCustomers(restaurantId);
+    
+    const mapped = dbCustomers.map((c: any) => {
+      const completedOrders = (c.orders || []).filter((o: any) => o.status === "completed");
+      const totalOrders = completedOrders.length;
+      const totalSpent = completedOrders.reduce((sum: number, o: any) => sum + parseFloat(o.total || 0), 0);
+      
+      const lastVisit = completedOrders.length > 0
+        ? new Date(Math.max(...completedOrders.map((o: any) => new Date(o.completed_at || o.created_at).getTime()))).toLocaleDateString("es-CL", {
+            day: "numeric",
+            month: "short",
+            hour: "2-digit",
+            minute: "2-digit"
+          })
+        : "Sin visitas";
+        
+      const itemCounts: Record<string, number> = {};
+      completedOrders.forEach((o: any) => {
+        const items = Array.isArray(o.items) ? o.items : [];
+        items.forEach((item: any) => {
+          if (item.name) {
+            itemCounts[item.name] = (itemCounts[item.name] || 0) + (item.quantity || 1);
+          }
+        });
+      });
+      
+      let favoriteDish = "Ninguno";
+      let maxCount = 0;
+      for (const [name, count] of Object.entries(itemCounts)) {
+        if (count > maxCount) {
+          maxCount = count;
+          favoriteDish = name;
+        }
+      }
+      
+      return {
+        id: c.id,
+        name: c.name,
+        phone: c.phone,
+        email: c.email || undefined,
+        notes: c.notes || undefined,
+        totalOrders,
+        totalSpent,
+        lastVisit,
+        favoriteDish,
+      };
+    });
+    
+    setCustomers(mapped);
+    setLoading(false);
+  };
+
+  useEffect(() => {
+    if (restaurantId) {
+      loadCrmData();
+    }
+  }, [restaurantId]);
 
   const filteredCustomers = customers.filter(
     (c) =>
@@ -79,17 +100,17 @@ export const Crm: React.FC = () => {
     setShowAddNoteModal(true);
   };
 
-  const handleSaveNotes = () => {
+  const handleSaveNotes = async () => {
     if (!selectedCustomer) return;
-    const updated = customers.map((c) => {
-      if (c.id === selectedCustomer.id) {
-        return { ...c, notes: noteText };
-      }
-      return c;
-    });
-    setCustomers(updated);
-    setShowAddNoteModal(false);
-    setSelectedCustomer(null);
+    const { error } = await updateCustomer(selectedCustomer.id, { notes: noteText });
+    if (error) {
+      console.error("Error updating customer notes:", error);
+      alert("No se pudo guardar la nota");
+    } else {
+      await loadCrmData();
+      setShowAddNoteModal(false);
+      setSelectedCustomer(null);
+    }
   };
 
   return (
@@ -122,70 +143,81 @@ export const Crm: React.FC = () => {
             className="pl-10 w-full"
           />
         </div>
-      </Card>
-
-      {/* Customer List */}
-      <div className="grid gap-6">
-        {filteredCustomers.map((customer) => (
-          <Card key={customer.id} className="hover:shadow-md transition-shadow">
-            <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6">
-              {/* Profile info */}
-              <div className="flex items-start gap-4 flex-1">
-                <div className="p-3.5 bg-accent/5 rounded-full text-accent flex-shrink-0">
-                  <User className="w-6 h-6" />
-                </div>
-                <div className="space-y-2 flex-1">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <h3 className="text-lg font-bold text-text">{customer.name}</h3>
-                    <Badge variant="neutral" className="bg-orange-50 text-orange-700 border border-orange-100 flex items-center gap-1 text-xs">
-                      Favorito: {customer.favoriteDish}
-                    </Badge>
+      </Card>      {/* Customer List */}
+      {loading ? (
+        <div className="text-center py-12">
+          <div className="w-8 h-8 border-2 border-accent border-t-transparent rounded-full animate-spin mx-auto mb-3" />
+          <p className="text-text-secondary text-sm">Cargando datos del CRM...</p>
+        </div>
+      ) : filteredCustomers.length === 0 ? (
+        <Card className="text-center py-12 text-text-secondary bg-bg border-border">
+          <Users className="w-12 h-12 mx-auto text-text-secondary opacity-50 mb-3" />
+          <p className="text-sm font-semibold">No se encontraron clientes</p>
+          <p className="text-xs text-text-secondary mt-1">Registra nuevos pedidos en la Caja POS para añadir clientes al CRM.</p>
+        </Card>
+      ) : (
+        <div className="grid gap-6">
+          {filteredCustomers.map((customer) => (
+            <Card key={customer.id} className="hover:shadow-md transition-shadow">
+              <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6">
+                {/* Profile info */}
+                <div className="flex items-start gap-4 flex-1">
+                  <div className="p-3.5 bg-accent/5 rounded-full text-accent flex-shrink-0">
+                    <User className="w-6 h-6" />
                   </div>
-                  <div className="grid sm:grid-cols-2 md:grid-cols-3 gap-x-6 gap-y-1 text-sm text-text-secondary">
-                    <p className="flex items-center gap-1.5">
-                      <Phone className="w-4 h-4 text-text-secondary/60" />
-                      {customer.phone}
-                    </p>
-                    {customer.email && (
-                      <p className="flex items-center gap-1.5">
-                        <Mail className="w-4 h-4 text-text-secondary/60" />
-                        {customer.email}
-                      </p>
-                    )}
-                    <p className="flex items-center gap-1.5">
-                      <Clock className="w-4 h-4 text-text-secondary/60" />
-                      Último pedido: {customer.lastVisit}
-                    </p>
-                  </div>
-
-                  {customer.notes && (
-                    <div className="p-3 bg-bg-subtle rounded-lg border border-border text-sm text-text-secondary italic flex gap-1.5 items-start">
-                      <FileText className="w-4 h-4 text-text-secondary/70 flex-shrink-0 mt-0.5" />
-                      <p>{customer.notes}</p>
+                  <div className="space-y-2 flex-1">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <h3 className="text-lg font-bold text-text">{customer.name}</h3>
+                      <Badge variant="neutral" className="bg-orange-500/10 text-orange-650 border border-orange-500/20 flex items-center gap-1 text-xs">
+                        Favorito: {customer.favoriteDish}
+                      </Badge>
                     </div>
-                  )}
-                </div>
-              </div>
+                    <div className="grid sm:grid-cols-2 md:grid-cols-3 gap-x-6 gap-y-1 text-sm text-text-secondary">
+                      <p className="flex items-center gap-1.5">
+                        <Phone className="w-4 h-4 text-text-secondary/60" />
+                        {customer.phone}
+                      </p>
+                      {customer.email && (
+                        <p className="flex items-center gap-1.5">
+                          <Mail className="w-4 h-4 text-text-secondary/60" />
+                          {customer.email}
+                        </p>
+                      )}
+                      <p className="flex items-center gap-1.5">
+                        <Clock className="w-4 h-4 text-text-secondary/60" />
+                        Último pedido: {customer.lastVisit}
+                      </p>
+                    </div>
 
-              {/* Purchase statistics */}
-              <div className="flex sm:items-center justify-between lg:flex-col lg:items-end gap-4 border-t lg:border-t-0 lg:border-l border-border pt-4 lg:pt-0 lg:pl-6 min-w-[200px]">
-                <div className="text-left lg:text-right">
-                  <p className="text-xs text-text-secondary uppercase tracking-wider">Historial de Consumo</p>
-                  <p className="text-2xl font-black text-text mt-0.5">
-                    ${customer.totalSpent.toLocaleString("es-CL")}
-                  </p>
-                  <p className="text-xs text-text-secondary mt-0.5">
-                    {customer.totalOrders} pedidos completados
-                  </p>
+                    {customer.notes && (
+                      <div className="p-3 bg-bg-subtle rounded-lg border border-border text-sm text-text-secondary italic flex gap-1.5 items-start">
+                        <FileText className="w-4 h-4 text-text-secondary/70 flex-shrink-0 mt-0.5" />
+                        <p>{customer.notes}</p>
+                      </div>
+                    )}
+                  </div>
                 </div>
-                <Button variant="outline" size="sm" onClick={() => handleOpenNotes(customer)}>
-                  Editar Notas
-                </Button>
+
+                {/* Purchase statistics */}
+                <div className="flex sm:items-center justify-between lg:flex-col lg:items-end gap-4 border-t lg:border-t-0 lg:border-l border-border pt-4 lg:pt-0 lg:pl-6 min-w-[200px]">
+                  <div className="text-left lg:text-right">
+                    <p className="text-xs text-text-secondary uppercase tracking-wider">Historial de Consumo</p>
+                    <p className="text-2xl font-black text-text mt-0.5">
+                      ${customer.totalSpent.toLocaleString("es-CL")}
+                    </p>
+                    <p className="text-xs text-text-secondary mt-0.5">
+                      {customer.totalOrders} pedidos completados
+                    </p>
+                  </div>
+                  <Button variant="outline" size="sm" onClick={() => handleOpenNotes(customer)}>
+                    Editar Notas
+                  </Button>
+                </div>
               </div>
-            </div>
-          </Card>
-        ))}
-      </div>
+            </Card>
+          ))}
+        </div>
+      )}
 
       {/* Edit Notes Modal */}
       <Modal

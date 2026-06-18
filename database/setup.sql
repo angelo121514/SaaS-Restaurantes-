@@ -95,6 +95,7 @@ CREATE TABLE IF NOT EXISTS menu_items (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   restaurant_id UUID NOT NULL REFERENCES restaurants(id) ON DELETE CASCADE,
   category_id UUID REFERENCES menu_categories(id) ON DELETE SET NULL,
+  category TEXT,
   name TEXT NOT NULL,
   description TEXT,
   base_price DECIMAL(10, 2) NOT NULL CHECK (base_price >= 0),
