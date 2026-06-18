@@ -293,6 +293,7 @@ const MenuItemModal: React.FC<MenuItemModalProps> = ({
   onClose,
   mode,
 }) => {
+  const restaurantId = useRestaurantId();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [formData, setFormData] = useState({
@@ -344,8 +345,7 @@ const MenuItemModal: React.FC<MenuItemModalProps> = ({
       return;
     }
 
-    const user = getStoredUser();
-    if (!user?.restaurant_id) {
+    if (!restaurantId) {
       setError("No se encontró el ID del restaurante");
       return;
     }
@@ -353,7 +353,7 @@ const MenuItemModal: React.FC<MenuItemModalProps> = ({
     setLoading(true);
 
     const menuItemData = {
-      restaurant_id: user.restaurant_id,
+      restaurant_id: restaurantId,
       name: formData.name,
       description: formData.description || undefined,
       category: formData.category || undefined,
