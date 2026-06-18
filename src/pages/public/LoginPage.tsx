@@ -16,6 +16,15 @@ const LoginPage: React.FC = () => {
   });
 
   useEffect(() => {
+    // Verificar si hay errores reportados en la URL (ej: redirigido desde RequireRole)
+    const queryParams = new URLSearchParams(window.location.search);
+    const errType = queryParams.get("error");
+    if (errType === "no_restaurant" || errType === "no_profile") {
+      setError("Tu cuenta no está asociada a ningún restaurante registrado. Por favor regístrate primero.");
+      supabase.auth.signOut();
+      return;
+    }
+
     // Tras volver de Google OAuth, la sesión JWT ya está establecida.
     // onAuthStateChange (gestionado por useAuth) resuelve el perfil; aquí
     // solo validamos pertenencia a un restaurante activo y navegamos.
@@ -32,7 +41,7 @@ const LoginPage: React.FC = () => {
           .eq("id", session.user.id)
           .single();
 
-        if (!profile) {
+        if (!profile || (profile.role !== "admin" && !profile.restaurant_id)) {
           setError(
             "Tu cuenta de Google no está asociada a ningún restaurante registrado. Por favor regístrate primero."
           );
@@ -160,7 +169,16 @@ const LoginPage: React.FC = () => {
           return;
         }
 
-        if (profile?.restaurant_id) {
+        if (!profile || (profile.role !== "admin" && !profile.restaurant_id)) {
+          await supabase.auth.signOut();
+          setError(
+            "Tu cuenta no está asociada a ningún restaurante registrado. Por favor regístrate primero."
+          );
+          setLoading(false);
+          return;
+        }
+
+        if (profile.restaurant_id) {
           const { data: rest } = await supabase
             .from("restaurants")
             .select("is_active")

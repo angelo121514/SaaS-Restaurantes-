@@ -169,10 +169,12 @@ const RegisterPage: React.FC = () => {
     setLoading(true);
 
     try {
-      const { data: insertedData, error: insertError } = await supabase
+      const requestId = crypto.randomUUID();
+      const { error: insertError } = await supabase
         .from("registration_requests")
         .insert([
           {
+            id: requestId,
             restaurant_name: formData.restaurant_name.trim(),
             owner_name: formData.owner_name.trim(),
             phone: formData.phone.replace(/[\s\-()]/g, ""),
@@ -184,18 +186,14 @@ const RegisterPage: React.FC = () => {
             notes: formData.notes.trim() || null,
             status: "pending",
           },
-        ])
-        .select("id")
-        .single();
+        ]);
 
       if (insertError) {
         throw insertError;
       }
 
-      if (insertedData) {
-        setCreatedRequestId(insertedData.id);
-        setStep("payment");
-      }
+      setCreatedRequestId(requestId);
+      setStep("payment");
     } catch (err: any) {
       console.error("Error de registro:", err);
       setError(

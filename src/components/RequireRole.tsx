@@ -38,11 +38,18 @@ export const RequireRole: React.FC<RequireRoleProps> = ({
     return <Navigate to={redirectTo} replace />;
   }
 
-  // Si aún no tenemos profile (caso límite), dejamos pasar si solo
-  // pedimos 'owner' (los nuevos usuarios sin restaurante aún entran).
-  if (profile && role === "admin" && profile.role !== "admin") {
-    // Un owner intentando entrar a /admin → lo mandamos a su panel.
-    return <Navigate to="/restaurant" replace />;
+  // Si no hay perfil, o el rol no es admin y no está asociado a un restaurante, no dejar pasar
+  if (profile) {
+    if (profile.role !== "admin" && !profile.restaurant_id) {
+      return <Navigate to="/login?error=no_restaurant" replace />;
+    }
+    if (role === "admin" && profile.role !== "admin") {
+      // Un owner intentando entrar a /admin → lo mandamos a su panel.
+      return <Navigate to="/restaurant" replace />;
+    }
+  } else {
+    // Si el perfil aún está vacío y no es admin, redirigir
+    return <Navigate to="/login?error=no_profile" replace />;
   }
 
   return <>{children}</>;
