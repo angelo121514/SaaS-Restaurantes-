@@ -135,6 +135,86 @@ export interface AdminUser {
 }
 
 // --------------------------------------------------------------------
+// Privacidad (Ley 19.628 / Ley 21.719) — Capa 2
+// --------------------------------------------------------------------
+
+export type ConsentScope =
+  | "cookies"
+  | "marketing"
+  | "ai_profiling"
+  | "analytics"
+  | "third_party_share";
+
+export type ConsentLegalBasis =
+  | "consent"
+  | "contract"
+  | "legal_obligation"
+  | "legitimate_interest";
+
+/** Fila de public.consents (Capa 1, 03_privacy_consents.sql). */
+export interface Consent {
+  id: string;
+  subject_id: string | null;
+  subject_email: string;
+  scope: ConsentScope;
+  purpose: string;
+  legal_basis: ConsentLegalBasis;
+  granted: boolean;
+  granted_at: string | null;
+  revoked_at: string | null;
+  proof: {
+    ip?: string;
+    user_agent?: string;
+    via?: "cookie_banner" | "first_login_modal" | "dsar" | "account_panel";
+    policy_version?: string;
+  } | null;
+  privacy_policy_version: string;
+  created_at: string;
+}
+
+export type DsarType =
+  | "access"
+  | "rectify"
+  | "erase"
+  | "object"
+  | "export"
+  | "revoke-consent"
+  | "contact";
+
+export type DsarStatus =
+  | "pending"
+  | "verified"
+  | "in_progress"
+  | "fulfilled"
+  | "rejected"
+  | "cancelled";
+
+/** Fila de public.data_subject_requests (Capa 1, 07_data_subject_requests.sql). */
+export interface DataSubjectRequest {
+  id: string;
+  request_type: DsarType;
+  subject_id: string | null;
+  subject_email: string;
+  verification_token: string;
+  token_expires_at: string;
+  status: DsarStatus;
+  payload: Record<string, unknown> | null;
+  fulfilled_at: string | null;
+  fulfilled_by: string | null;
+  result_metadata: Record<string, unknown> | null;
+  rejection_reason: string | null;
+  sla_due_at: string;
+  created_at: string;
+  updated_at: string;
+}
+
+/** Versión vigente de la política de privacidad (docs/legal/VERSION.md). */
+export const CURRENT_POLICY_VERSION = "2026-06-01";
+
+/** Email de contacto del DPO (placeholder editable). */
+export const DPO_EMAIL = "dpo@cmorflow.cl";
+
+// --------------------------------------------------------------------
 // LOCAL STORAGE MOCK SUPABASE CLIENT
 // --------------------------------------------------------------------
 class MockSupabaseClient {
