@@ -19,6 +19,12 @@ const AdminDashboard = lazy(() => import("./pages/admin/Dashboard"));
 const CustomerMenu = lazy(() => import("./pages/customer/CustomerMenu"));
 const NotFoundPage = lazy(() => import("./pages/NotFoundPage"));
 
+// Privacy pages — Ley 19.628 / Ley 21.719
+const PublicPrivacy = lazy(() => import("./pages/public/Privacy"));
+const PublicPrivacyClients = lazy(() => import("./pages/public/PrivacyClients"));
+const PublicContactDpo = lazy(() => import("./pages/public/ContactDpo"));
+import { CookieBanner } from "./components/privacy/CookieBanner";
+
 // Lightweight fallback shown while a lazy route resolves its chunk.
 const RouteFallback: React.FC = () => (
   <div className="min-h-screen flex items-center justify-center bg-bg">
@@ -39,6 +45,11 @@ function App() {
           <Route path="/register" element={<RegisterPage />} />
           <Route path="/login" element={<LoginPage />} />
           <Route path="/setup-password" element={<SetupPassword />} />
+
+          {/* Legal / Privacy (publicas) */}
+          <Route path="/legal/privacidad" element={<PublicPrivacy />} />
+          <Route path="/legal/privacidad-clientes" element={<PublicPrivacyClients />} />
+          <Route path="/legal/contacto-dpo" element={<PublicContactDpo />} />
 
           {/* Restaurant Dashboard Routes */}
           <Route
@@ -69,6 +80,7 @@ function App() {
           <Route path="*" element={<Navigate to="/404" replace />} />
         </Routes>
       </Suspense>
+      <CookieBanner />
     </BrowserRouter>
   );
 }
