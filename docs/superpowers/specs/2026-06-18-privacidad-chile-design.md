@@ -5,6 +5,7 @@
 - **Marco normativo:** Ley N° 19.628 (protección de datos personales) y Ley N° 21.719 (vigencia nacional: **1 de diciembre de 2026**), inspirada en el RGPD.
 - **Enfoque:** por capas de madurez (A), 4 capas en orden de dependencia técnica.
 - **Disclaimer legal:** los documentos legales (política, aviso, DPA, AIPD) son **borradores técnicos**. Requieren revisión de un abogado chileno antes de publicación oficial.
+- **Disclaimer de retención:** las retenciones en D7 son **valores por defecto sujetos a validación legal/operativa**, no compromisos definitivos. Se ajustarán en la revisión con abogado y/o contabilidad tributaria.
 
 ---
 
@@ -18,7 +19,7 @@
 | D4 | Aplicación SQL | Archivos `.sql` numerados en `database/`. Aplicación por MCP desde Antigravity (otra vía), NO esta sesión. |
 | D5 | Responsable del tratamiento | Compartido: Cmor Flow responsable B2B (owners/staff/admins); Restaurantes responsables de clientes finales; Cmor Flow encargado de los clientes finales que procesa. |
 | D6 | Enfoque | A — 4 capas de madurez. |
-| D7 | Retenciones por defecto | B2B: contrato + 90 días. Clientes: 24 meses sin pedidos. Orders: 6 años (SII). Prospectos: 12 meses. Tokens: 7 días. Audit log: 24 meses. Consents: revocación + 3 años. DSARs: 6 años. |
+| D7 | Retenciones por defecto *(sujetas a validación legal/operativa)* | Ver desglose en §1.3 — los plazos son de negocio/operativos, **no** obligaciones legales derivadas de la Ley 21.719 (la ley no fija plazos por categoría). Única obligación legal explícita: **6 años para documentos tributarios (orders)**, impuesta por el SII, no por la ley de protección de datos. |
 | D8 | MFA obligatorio | Roles `admin` y `owner`. `staff` opcional. |
 | D9 | `admin_users` legacy | Deprecar (COMMENT + REVOKE), conservar datos, login admin pasa solo por Supabase Auth. |
 | D10 | Camino de retención | pg_cron (camino A). |
@@ -57,17 +58,25 @@ Terceros: Vercel (USA), Supabase (USA/AWS), email provider, N8N (opcional)
 
 ### 1.3 Inventario de categorías de datos (con retención D7)
 
-| Categoría | Campos | Tablas | Sensible | Retención |
-|---|---|---|---|---|
-| Identidad B2B | owner_name, display_name | restaurants, profiles | No | Contrato + 90 días |
-| Contacto B2B | email, phone, city, address | restaurants, profiles | No | Contrato + 90 días |
-| Autenticación | password_hash, last_login_at | auth.users, users (legacy) | Crítica | Hasta baja |
-| Identidad cliente | customer_name | restaurant_customers, orders | No | 24 meses |
-| Contacto cliente | phone, email | restaurant_customers, orders | No | 24 meses |
-| Transaccional | items, total, payment_method | orders | No (financiero) | 6 años (SII) |
-| Tokens | token | invitations | Crítica | 7 días |
-| Operativos | internal_notes, block_reason | varias | No | Igual que tabla padre |
-| IA (chatbot) | mensajes | (no persistidos) | — | 0 — stateless, no entrena |
+**Naturaleza del plazo:** `📊 negocio` (decisión operativa, ajustable) · `⚖️ ley` (obligación legal externa, no modificable).
+
+| Categoría | Campos | Tablas | Sensible | Retención | Naturaleza | Acción al expirar |
+|---|---|---|---|---|---|---|
+| Identidad B2B | owner_name, display_name | restaurants, profiles | No | Vida del contrato; al baja, **+90 días solo para inactivos** | 📊 negocio | Anonimizar tras baja confirmada |
+| Contacto B2B | email, phone, city, address | restaurants, profiles | No | Igual identidad B2B | 📊 negocio | Anonimizar |
+| Autenticación | password_hash, last_login_at | auth.users, users (legacy) | Crítica | Hasta baja del usuario | 📊 negocio | Soft-delete en Supabase Auth |
+| Identidad cliente | customer_name | restaurant_customers, orders | No | 24 meses sin pedidos | 📊 negocio | Anonimizar (mantener para stats) |
+| Contacto cliente | phone, email | restaurant_customers, orders | No | 24 meses sin pedidos | 📊 negocio | Anonimizar |
+| Transaccional | items, total, payment_method | orders | No (financiero) | **6 años** | ⚖️ ley (SII) | **Anonimizar personales**, conservar monto/items |
+| Prospectos | registration_requests | — | No | 12 meses desde último contacto | 📊 negocio | Borrar fila |
+| Tokens | token | invitations | Crítica | 7 días o hasta consumo | 📊 negocio | Borrar fila |
+| Operativos | internal_notes, block_reason | varias | No | Igual que tabla padre | 📊 negocio | Igual que tabla padre |
+| Audit log | (eventos) | audit_log | — | 24 meses base; **36 meses para eventos de seguridad/auth** | 📊 negocio | Archivo frío + borrar |
+| Consents | (prueba de consentimiento) | consents | — | Revocación + 3 años | ⚖️ ley (prueba de cumplimiento) | Conservar prueba |
+| DSARs (evidencia) | data_subject_requests | — | — | 6 años — **solo metadatos mínimos** (id, tipo, fecha, resultado, prueba de respuesta) | ⚖️ ley (prueba de cumplimiento) | El contenido del DSAR se anonimiza a los 12 meses |
+| IA (chatbot) | mensajes | (no persistidos) | — | 0 — stateless | — | No aplica |
+
+**Principio de anonimización legal (refuerzo del §3.2):** cuando un titular pide supresión pero existe obligación legal de conservar el registro (ej. orders 6 años SII), **se anonimizan los campos personales** (`customer_name=NULL`, `customer_phone=NULL`, `customer_notes=NULL`, `anonymized_at=now()`) **en lugar de borrar la fila**. El registro financiero/tributario se conserva; la identidad del titular se pierde.
 
 ### 1.4 Hard defaults
 
@@ -172,25 +181,31 @@ WITH (fillfactor=95); REVOKE UPDATE, DELETE FROM public;
 
 ### 3.1 Documentos legales (4, español de Chile, versionados)
 
-| Documento | Para quién | Dónde |
-|---|---|---|
-| Política de privacidad B2B | Owners, staff, admins | Footer `/legal/privacidad` + alta de cuenta |
-| Aviso de privacidad B2B (resumen) | Owners, staff | Modal primer login + link en `/restaurant/settings` |
-| Política de privacidad clientes finales | Clientes `/menu/:slug` | Footer del menú + modal al ingresar datos |
-| Términos + DPA cliente | Owners onboarding | Checkbox en `/register` |
+Ubicados en `docs/legal/` (ver estructura final). Revisión por abogado antes de publicar.
 
-Cada documento con 10 bloques: responsable, finalidades, categorías, destinatarios, transferencias, derechos, conservación, DPO, base legal, reclamación.
+| Documento | Ruta | Para quién | Dónde se muestra |
+|---|---|---|---|
+| Política de privacidad B2B | `docs/legal/politica_privacidad_b2b.md` | Owners, staff, admins | Footer `/legal/privacidad` + alta de cuenta |
+| Aviso de privacidad B2B (resumen) | `docs/legal/aviso_privacidad_b2b.md` | Owners, staff | Modal primer login + link en `/restaurant/settings` |
+| Política de privacidad clientes finales | `docs/legal/politica_privacidad_clientes.md` | Clientes `/menu/:slug` | Footer del menú + modal al ingresar datos |
+| Términos y condiciones + DPA cliente | `docs/legal/terminos_y_condiciones.md` | Owners onboarding | Checkbox en `/register` |
+
+Cada documento con 10 bloques: responsable, finalidades, categorías, destinatarios, transferencias, derechos (incluidos **oposición y portabilidad explícitos**), conservación, DPO, base legal, reclamación.
+
+**Versionado:** `docs/legal/VERSION.md` lleva el changelog. Cada cambio de política sube versión (ej. `2026-06-01` → `2026-09-01`) y los `consents` nuevos graban la versión vigente.
 
 ### 3.2 Derechos del titular (DSAR) — 6 endpoints Edge Functions
 
-| Derecho | Endpoint | Plazo |
-|---|---|---|
-| Acceso | `privacy/access` | 30 días |
-| Rectificación | `privacy/rectify` | 15 días |
-| Cancelación | `privacy/erase` | 30 días (+ purge backups) |
-| Oposición | `privacy/object` | 30 días |
-| Portabilidad | `privacy/export` | 30 días (JSON/CSV) |
-| Revocación | `privacy/revoke-consent` | Inmediato |
+Los **6 derechos** son entregables obligatorios y verificables. Cada uno tiene endpoint, RPC y UI asociada. No son opcionales ni quedan solo en la tabla:
+
+| Derecho | Art. (Ley 21.719) | Endpoint | Plazo | Entregable obligatorio |
+|---|---|---|---|---|
+| **Acceso** | Art. 19 | `privacy/access` | 30 días | Sí — el titular recibe un reporte de los datos que tenemos sobre él |
+| **Rectificación** | Art. 19 | `privacy/rectify` | 15 días | Sí — formulario de corrección de datos inexactos |
+| **Cancelación (supresión)** | Art. 19 | `privacy/erase` | 30 días (+ purge backups) | Sí — ejecuta anonimización/borrado según la categoría (ver §1.3) |
+| **Oposición** | Art. 19 | `privacy/object` | 30 días | Sí — el titular puede oponerse a un tratamiento específico (ej. marketing, analítica) sin cancelar la cuenta |
+| **Portabilidad** | Art. 19 | `privacy/export` | 30 días | Sí — entrega en **JSON + CSV** estructurado, no PDF |
+| **Revocación de consentimiento** | Art. 7 | `privacy/revoke-consent` | Inmediato | Sí — revoca un scope específico sin tocar el resto |
 
 **Flujo:**
 ```
@@ -306,12 +321,17 @@ Plantilla: `docs/privacidad/aipd_plantilla.md` (9 secciones obligatorias).
 
 ### 4.4 Privacidad en IA (requisito 11)
 
-`docs/privacidad/reglas_ia.md`:
-1. No entrenamiento de modelos con datos personales sin consentimiento + AIPD.
-2. No persistencia de prompts (chatbot stateless; futuro LLM requiere consentimiento).
-3. Pseudonimización antes de enviar a LLM.
-4. Filtro anti datos sensibles (RUN, tarjeta, salud) en prompts.
-5. Logging solo metadatos en `ai_usage_log` (opcional): `user_id`, `timestamp`, `model`, `tokens`. Nunca contenido.
+**Estado actual (hoy):** el chatbot (`AiChatbot.tsx`) es keyword-based y **stateless** — los mensajes viven solo en memoria del navegador (state de React), **no se persisten en ninguna base de datos**, no se envían a ningún modelo externo, y **no se usan para entrenar nada**. Esta afirmación debe quedar explícita en la política de privacidad y en `reglas_ia.md`.
+
+**Reglas obligatorias — `docs/privacidad/reglas_ia.md`:**
+
+1. **No persistencia actual:** las conversaciones del chatbot **no se guardan** en DB. Si en el futuro se quiere persistir historial, requiere consentimiento explícito del titular + AIPD-03 activada.
+2. **No entrenamiento:** ningún proveedor de IA puede usar datos del proyecto para entrenar. Si se integra OpenAI/Anthropic/etc.: contrato Zero Data Retention + confirmación por escrito + bloqueo del flag `training` de la API.
+3. **Pseudonimización:** si en el futuro se envían datos a un LLM, se reemplazan `customer_name`, `phone`, `email` por tokens antes del envío.
+4. **Sin datos sensibles en prompts:** filtro que detecta patrones (RUN, tarjeta, salud, biometría) y los bloquea antes de cualquier llamada externa.
+5. **Logging solo de metadatos:** se registra en `ai_usage_log` (tabla nueva opcional) — `user_id`, `timestamp`, `model`, `tokens`, `scope`. **Nunca** el contenido del prompt ni de la respuesta.
+
+**AIPD-03 (chatbot) — estado `dormida`:** se mantiene redactada y lista para activar si/hay migración a LLM. No se aplica hoy porque no hay LLM. La activación requiere: consentimiento granular `ai_profiling=true`, AIPD firmada, y contrato con proveedor IA.
 
 ### 4.5 Refuerzo de seguridad operacional
 
@@ -392,9 +412,16 @@ objeto, finalidad, duración, instrucciones del responsable, confidencialidad, m
 
 ## Estructura final de entregables
 
+La organización separa claramente **4 dominios**: documentación legal (`docs/legal/`), documentación operativa (`docs/privacidad/`, `docs/seguridad/`), código SQL (`database/`), y automatización (`scripts/`). Esto evita que se mezclen políticas (que revisa un abogado) con scripts técnicos (que ejecuta un dev).
+
 ```
 SaaS suchi/
-├── database/
+│
+├── README.md                          ← (NUEVO) guía operativa: cómo aplicar
+│                                         el plan, orden de ejecución, checklist
+│                                         inicial, y links a cada entregable.
+│
+├── database/                          ← SQL para Supabase (aplicar vía MCP)
 │   ├── 03_privacy_consents.sql
 │   ├── 04_audit_log.sql
 │   ├── 05_rls_hardening.sql
@@ -403,31 +430,48 @@ SaaS suchi/
 │   ├── 08_retention.sql
 │   ├── 09_breach_register.sql
 │   ├── 10_pg_cron_schedule.sql
-│   └── migrations_rollback.sql
-├── supabase/functions/
+│   └── migrations_rollback.sql        ← HERRAMIENTA DE EMERGENCIA, no flujo normal.
+│                                         Solo se usa si una migración sale mal.
+│                                         Documentado en README.md §"Rollback".
+│
+├── supabase/functions/                ← Edge Functions (código TypeScript)
+│   ├── invite-owner/                  (existe)
 │   ├── privacy-access/
 │   ├── privacy-rectify/
 │   ├── privacy-erase/
 │   ├── privacy-object/
 │   ├── privacy-export/
 │   └── privacy-revoke-consent/
-├── src/components/privacy/
+│
+├── src/components/privacy/            ← UI React
 │   ├── ConsentManager.tsx
 │   ├── CookieBanner.tsx
 │   ├── DsarForm.tsx
 │   └── PrivacyPolicyModal.tsx
+│
 ├── src/pages/
-│   ├── public/Privacy.tsx
-│   ├── restaurant/Privacy.tsx
-│   └── admin/Privacy.tsx
+│   ├── public/Privacy.tsx             (/legal/privacidad)
+│   ├── restaurant/Privacy.tsx         (/account/privacy)
+│   └── admin/Privacy.tsx              (/admin/privacy)
+│
+├── scripts/                           ← Automatización (NO SQL, NO docs).
+│   │                                    Ejecutables con npm run X.
+│   ├── security-check.ts              (npm run security-check)
+│   ├── seed-policy-versions.ts        (actualiza versión vigente)
+│   └── dsar-cron-check.ts             (opcional, si no se usa pg_cron)
+│
 ├── docs/
-│   ├── privacidad/
-│   │   ├── 01_politica_privacidad_b2b.md
-│   │   ├── 02_aviso_privacidad_b2b.md
-│   │   ├── 03_politica_privacidad_clientes.md
-│   │   ├── 04_terminos_y_dpa_cliente.md
-│   │   ├── VERSION.md
-│   │   ├── RAT.md
+│   ├── legal/                         ← (NUEVO) documentos legales centralizados.
+│   │   │                                Lo que revisa el abogado. Versionado.
+│   │   ├── politica_privacidad_b2b.md
+│   │   ├── aviso_privacidad_b2b.md
+│   │   ├── politica_privacidad_clientes.md
+│   │   ├── terminos_y_condiciones.md
+│   │   ├── VERSION.md                 ← changelog de versiones vigentes
+│   │   └── contacto_dpo.md            ← datos de contacto del DPO
+│   │
+│   ├── privacidad/                    ← documentación operativa de privacidad
+│   │   ├── RAT.md                     ← Registro de Actividades de Tratamiento
 │   │   ├── aipd_01_onboarding.md
 │   │   ├── aipd_02_crm_clientes.md
 │   │   ├── aipd_03_chatbot_dormida.md
@@ -435,19 +479,27 @@ SaaS suchi/
 │   │   ├── aipd_plantilla.md
 │   │   ├── reglas_ia.md
 │   │   ├── transferencias_internacionales.md
-│   │   └── checklist_trimestral.md
-│   ├── contratos/
+│   │   └── checklist_trimestral.md    ← (confirmado) vive aquí dentro
+│   │
+│   ├── contratos/                     ← DPAs (también revisa el abogado)
 │   │   ├── DPA_cmor_restaurante.md
 │   │   └── DPA_proveedores.md
+│   │
 │   └── seguridad/
 │       ├── plantilla_notificacion_autoridad.md
 │       ├── plantilla_notificacion_titulares.md
 │       ├── plantilla_comunicado_interno.md
 │       ├── playbook_respuesta_incidentes.md
 │       └── rotacion_secretos.md
-└── scripts/
-    └── security-check.ts
 ```
+
+**Notas de organización (respuesta a tu feedback):**
+
+- **`docs/legal/`** se separa de `docs/privacidad/` porque el abogado revisa `legal/` (texto normativo) mientras que el equipo de producto mantiene `privacidad/` (RAT, AIPD, reglas operativas). Confirma lo que pediste: centralizar políticas.
+- **`VERSION.md`** y **`checklist_trimestral.md`** quedan **dentro de `docs/`** (en `docs/legal/` y `docs/privacidad/` respectivamente), no dispersos.
+- **`scripts/`** es una carpeta aparte y clara: solo archivos ejecutables (`npm run X`), separados del SQL (`database/`) y de la documentación (`docs/`). El SQL de `database/` se aplica por MCP; los scripts de `scripts/` se corren desde la terminal.
+- **`migrations_rollback.sql`** se etiqueta como **herramienta de emergencia**, no entra en el flujo de aplicación normal. Solo se invoca si una migración falla. Se documenta su uso en `README.md` §"Rollback".
+- **`README.md` raíz** es la guía operativa: cómo aplicar el plan, orden de ejecución por capas, y links a cada entregable.
 
 ---
 
