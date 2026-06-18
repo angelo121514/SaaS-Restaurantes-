@@ -34,26 +34,55 @@ const SetupPassword: React.FC = () => {
 
   // 1. Verificar la sesión que trae el magic link.
   useEffect(() => {
-    const verify = async () => {
-      const { data } = await supabase.auth.getSession();
-      const session = data?.session;
-      if (session?.user?.email) {
+    let active = true;
+
+    const processSession = async (session: any) => {
+      if (!session?.user?.email) return false;
+      if (active) {
         setAuthorized(true);
         setInvitedEmail(session.user.email);
+        setCheckingSession(false);
 
         // 3. Consumir la invitación si hay token.
         if (inviteToken) {
-          // consume_invitation es SECURITY DEFINER: no necesita sesión de admin.
           try {
             await supabase.rpc("consume_invitation", { p_token: inviteToken });
-          } catch {
-            // No bloqueante: el profile ya existe; solo marca el estado.
+          } catch (e) {
+            console.error("Error consuming invitation:", e);
           }
         }
       }
-      setCheckingSession(false);
+      return true;
     };
-    verify();
+
+    // Verificar sesión inicial
+    supabase.auth.getSession().then(({ data }) => {
+      if (data?.session) {
+        processSession(data.session);
+      }
+    });
+
+    // Escuchar cambios de auth (cuando se procesa el hash del link)
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      async (_event, session) => {
+        if (session) {
+          await processSession(session);
+        }
+      }
+    );
+
+    // Timeout de fallback para dejar de verificar si no hay sesión
+    const timeout = setTimeout(() => {
+      if (active) {
+        setCheckingSession(false);
+      }
+    }, 2500);
+
+    return () => {
+      active = false;
+      subscription.unsubscribe();
+      clearTimeout(timeout);
+    };
   }, [inviteToken]);
 
   const handleSubmit = async (e: React.FormEvent) => {

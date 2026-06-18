@@ -26,9 +26,11 @@ import {
   createRestaurantAccount,
   rejectRegistrationRequest,
 } from "../../services/adminService";
-import type { RegistrationRequest } from "../../config/supabase";
+import { supabase, type RegistrationRequest } from "../../config/supabase";
 import { formatDateTime, copyToClipboard } from "../../utils/helpers";
 import { APP_CONFIG } from "../../config/config";
+
+const isMockMode = typeof (supabase as any).auth?.onAuthStateChange !== "function";
 
 const PendingRequests: React.FC = () => {
   const [requests, setRequests] = useState<RegistrationRequest[]>([]);
@@ -422,7 +424,9 @@ const CreateAccountModal: React.FC<CreateAccountModalProps> = ({
         <div className="bg-accent-secondary/10 border border-accent-secondary/20 rounded-lg p-3 text-sm">
           <AlertCircle className="w-4 h-4 text-accent-secondary inline mr-2" />
           <span className="text-text-secondary">
-            Se generará automáticamente una contraseña provisoria y se le enviará al restaurante. Podrán cambiarla tras su primer ingreso.
+            {isMockMode
+              ? "Se generará automáticamente una contraseña provisoria y se le enviará al restaurante. Podrán cambiarla tras su primer ingreso."
+              : "Se enviará un correo de invitación seguro al dueño. El enlace le permitirá definir su contraseña y activar su cuenta directamente."}
           </span>
         </div>
 
