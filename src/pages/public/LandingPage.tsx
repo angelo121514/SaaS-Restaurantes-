@@ -290,15 +290,15 @@ const LandingPage: React.FC = () => {
             </span>
             <button
               onClick={() => setBillingPeriod(billingPeriod === "monthly" ? "annual" : "monthly")}
-              className="relative w-14 h-8 bg-zinc-800 dark:bg-zinc-800 border border-border rounded-full transition-colors focus:outline-none"
+              className="relative w-14 h-8 bg-zinc-800 dark:bg-zinc-800 border border-border rounded-full transition-colors focus:outline-none p-1 flex items-center"
               aria-label="Alternar ciclo de facturación"
             >
-              <div className={`absolute top-0.5 left-0.5 w-6.5 h-6.5 rounded-full transition-transform ${billingPeriod === "annual" ? "translate-x-6 bg-amber-500" : "bg-red-500"}`} />
+              <div className={`w-6 h-6 rounded-full transition-all duration-300 transform ${billingPeriod === "annual" ? "translate-x-6 bg-amber-500" : "translate-x-0 bg-red-500"}`} />
             </button>
             <span className={`text-sm font-semibold transition-colors flex items-center gap-1.5 ${billingPeriod === "annual" ? "text-amber-500" : "text-text-secondary"}`}>
               Facturación Anual
               <span className="text-[10px] bg-amber-500/20 text-amber-400 px-2 py-0.5 rounded-full font-bold uppercase tracking-wider">
-                Ahorra 10%
+                Ahorra 15%
               </span>
             </span>
           </div>
@@ -323,10 +323,12 @@ const LandingPage: React.FC = () => {
               return (
                 <div
                   key={key}
-                  className={`bg-bg-subtle/60 border rounded-2xl p-8 flex flex-col justify-between transition-all duration-300 relative ${
+                  className={`bg-bg-subtle/60 border rounded-2xl p-8 flex flex-col justify-between transition-all duration-300 transform hover:-translate-y-1.5 hover:scale-[1.02] relative ${
                     isStarter
-                      ? "border-red-500 ring-1 ring-red-500/50 shadow-xl shadow-red-500/5 bg-bg/80"
-                      : "border-border hover:border-zinc-500"
+                      ? "border-red-500 ring-1 ring-red-500/50 shadow-xl shadow-red-500/5 bg-bg/80 hover:shadow-2xl hover:shadow-red-500/15"
+                      : isPro
+                      ? "border-border bg-bg/40 hover:border-amber-500 hover:shadow-2xl hover:shadow-amber-500/15"
+                      : "border-border bg-bg/40 hover:border-emerald-500 hover:shadow-2xl hover:shadow-emerald-500/15"
                   }`}
                 >
                   {isStarter && (

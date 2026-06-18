@@ -31,7 +31,7 @@ export const APP_CONFIG = {
     starter: {
       name: "Básico (Starter)",
       price: 40000,
-      price_annual: 432000, // 40.000 * 12 * 0.9
+      price_annual: 408000, // 40.000 * 12 * 0.85 (15% ahorro)
       duration: "por mes",
       features: [
         "Pedidos ilimitados",
@@ -44,7 +44,7 @@ export const APP_CONFIG = {
     pro: {
       name: "Pro",
       price: 120000,
-      price_annual: 1296000, // 120.000 * 12 * 0.9
+      price_annual: 1224000, // 120.000 * 12 * 0.85 (15% ahorro)
       duration: "por mes",
       features: [
         "Todo lo del plan Básico",
