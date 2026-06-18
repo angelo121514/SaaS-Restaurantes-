@@ -16,6 +16,7 @@ import {
   Users,
   BrainCircuit,
   Calculator,
+  ShieldCheck,
 } from "lucide-react";
 import RestaurantHome from "./RestaurantHome";
 import Orders from "./Orders";
@@ -25,6 +26,8 @@ import RestaurantSettings from "./RestaurantSettings";
 import Crm from "./Crm";
 import AiRecommendations from "./AiRecommendations";
 import Pos from "./Pos";
+import Privacy from "./Privacy";
+import { FirstLoginPrivacyModal } from "../../components/privacy/FirstLoginPrivacyModal";
 import { CmorFlowLogo } from "../../components/CmorFlowLogo";
 import { ThemeToggle } from "../../components/ThemeToggle";
 import { supabase } from "../../config/authClient";
@@ -71,6 +74,9 @@ const RestaurantDashboard: React.FC = () => {
       { path: "/restaurant/ai", icon: BrainCircuit, label: "IA Recomendaciones" }
     );
   }
+
+  // Privacy (panel del titular: consentimientos + DSAR)
+  navItems.push({ path: "/restaurant/privacy", icon: ShieldCheck, label: "Privacidad" });
 
   // Settings is always last
   navItems.push({ path: "/restaurant/settings", icon: Settings, label: "Configuración" });
@@ -160,9 +166,13 @@ const RestaurantDashboard: React.FC = () => {
           <Route path="reports" element={<Reports />} />
           <Route path="crm" element={<Crm />} />
           <Route path="ai" element={<AiRecommendations />} />
+          <Route path="privacy" element={<Privacy />} />
           <Route path="settings" element={<RestaurantSettings />} />
         </Routes>
       </div>
+
+      {/* Aviso de privacidad obligatorio al primer login (Ley 21.719) */}
+      <FirstLoginPrivacyModal />
 
       {/* Footer Branding */}
       <footer className="py-6 border-t border-border mt-12 text-center text-xs text-text-secondary flex flex-col items-center gap-1">
