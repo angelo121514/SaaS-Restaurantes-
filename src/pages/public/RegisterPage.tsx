@@ -245,6 +245,13 @@ const RegisterPage: React.FC = () => {
         throw new Error(data[0].message || "Error al activar el restaurante");
       }
 
+      // Invocar la Edge Function para procesar la cola y enviar el email al instante
+      try {
+        await supabase.functions.invoke("invite-owner");
+      } catch (funcErr) {
+        console.error("Error al disparar Edge Function de invitaciones:", funcErr);
+      }
+
       setStep("success");
     } catch (err: any) {
       console.error("Payment error:", err);
