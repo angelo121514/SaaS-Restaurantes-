@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { Download, QrCode as QrCodeIcon, ExternalLink, LifeBuoy } from "lucide-react";
+import { Download, QrCode as QrCodeIcon, ExternalLink, LifeBuoy, Copy, Check } from "lucide-react";
 import { Card, Button, Loading, Alert } from "../../components/ui";
 import { QRCodeSVG } from "qrcode.react";
 import { supabase } from "../../config/supabase";
@@ -11,6 +11,18 @@ const RestaurantSettings: React.FC = () => {
   const [restaurant, setRestaurant] = useState<Restaurant | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [copiedId, setCopiedId] = useState(false);
+
+  const handleCopyId = async () => {
+    if (!restaurant) return;
+    try {
+      await navigator.clipboard.writeText(restaurant.id);
+      setCopiedId(true);
+      setTimeout(() => setCopiedId(false), 2000);
+    } catch (err) {
+      console.error("Failed to copy", err);
+    }
+  };
 
   useEffect(() => {
     const fetchRestaurant = async () => {
@@ -121,6 +133,25 @@ const RestaurantSettings: React.FC = () => {
 
           {/* QR Code Info */}
           <div className="space-y-4">
+            <div>
+              <label className="label mb-2">ID del Restaurante</label>
+              <div className="p-3 bg-bg-subtle rounded-lg flex items-center justify-between text-text font-mono text-sm border border-border">
+                <span className="truncate select-all">{restaurant.id}</span>
+                <button
+                  type="button"
+                  onClick={handleCopyId}
+                  className="text-accent hover:text-accent-secondary p-1 rounded hover:bg-bg-subtle transition-colors ml-2"
+                  title="Copiar ID"
+                >
+                  {copiedId ? (
+                    <Check className="w-4 h-4 text-success animate-pulse" />
+                  ) : (
+                    <Copy className="w-4 h-4" />
+                  )}
+                </button>
+              </div>
+            </div>
+
             <div>
               <label className="label mb-2">Nombre del Local</label>
               <div className="p-3 bg-bg-subtle rounded-lg text-text font-medium">

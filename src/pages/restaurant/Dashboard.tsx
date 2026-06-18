@@ -35,6 +35,13 @@ const RestaurantDashboard: React.FC = () => {
   const location = useLocation();
   const { user, restaurant, loading } = useAuth();
 
+  const getTrialDaysLeft = (endsAt?: string) => {
+    if (!endsAt) return 0;
+    const diff = new Date(endsAt).getTime() - Date.now();
+    const days = Math.ceil(diff / (1000 * 60 * 60 * 24));
+    return days > 0 ? days : 0;
+  };
+
   const handleLogout = async () => {
     await supabase.auth.signOut();
     // El modo mock no expone signOut real: limpiamos el blob legado también.
@@ -77,9 +84,30 @@ const RestaurantDashboard: React.FC = () => {
             <div className="flex items-center space-x-4">
               <CmorFlowLogo size="sm" showText={false} />
               <div>
-                <h1 className="text-md font-bold text-text">
-                  {restaurant?.name || "Restaurante"}
-                </h1>
+                <div className="flex items-center gap-2">
+                  <h1 className="text-md font-extrabold text-text">
+                    {restaurant?.name || "Restaurante"}
+                  </h1>
+                  {restaurant && (
+                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${
+                      restaurant.subscription_plan === "free_trial"
+                        ? "bg-amber-500/10 text-amber-600 border-amber-500/20"
+                        : restaurant.subscription_plan === "pro"
+                        ? "bg-success/10 text-success border-success/20"
+                        : "bg-bg-subtle text-text-secondary border-border"
+                    }`}>
+                      {restaurant.subscription_plan === "free_trial"
+                        ? `Prueba (${getTrialDaysLeft(restaurant.trial_ends_at)} días)`
+                        : restaurant.subscription_plan === "starter"
+                        ? "Starter"
+                        : restaurant.subscription_plan === "pro"
+                        ? "Pro"
+                        : restaurant.subscription_plan === "enterprise"
+                        ? "Enterprise"
+                        : restaurant.subscription_plan}
+                    </span>
+                  )}
+                </div>
                 <p className="text-xs text-text-secondary">{user.email}</p>
               </div>
             </div>

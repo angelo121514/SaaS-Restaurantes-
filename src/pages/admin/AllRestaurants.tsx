@@ -34,6 +34,12 @@ const AllRestaurants: React.FC = () => {
   const [filteredRestaurants, setFilteredRestaurants] = useState<Restaurant[]>(
     []
   );
+  const getTrialDaysLeft = (endsAt?: string) => {
+    if (!endsAt) return 0;
+    const diff = new Date(endsAt).getTime() - Date.now();
+    const days = Math.ceil(diff / (1000 * 60 * 60 * 24));
+    return days > 0 ? days : 0;
+  };
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
@@ -172,7 +178,7 @@ const AllRestaurants: React.FC = () => {
         </div>
       </Card>
 
-      {/* Restaurants List */}
+      {/* Restaurants List Grouped by Owner Email */}
       {filteredRestaurants.length === 0 ? (
         <Card className="text-center py-12">
           <StoreIcon className="w-16 h-16 text-text-secondary mx-auto mb-4 opacity-50" />
@@ -186,109 +192,114 @@ const AllRestaurants: React.FC = () => {
           </p>
         </Card>
       ) : (
-        <div className="grid gap-4">
-          {filteredRestaurants.map((restaurant) => (
-            <Card
-              key={restaurant.id}
-              className="hover:shadow-lg transition-shadow"
-            >
-              <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-                {/* Restaurant Info */}
-                <div className="flex-1 space-y-3">
-                  {/* Header */}
-                  <div className="flex items-start justify-between">
-                    <div>
-                      <div className="flex items-center space-x-2 mb-1">
-                        <h3 className="text-lg font-bold text-text">
-                          {restaurant.name}
+        <div className="space-y-6">
+          {(() => {
+            const groupedByEmail: Record<string, Restaurant[]> = {};
+            filteredRestaurants.forEach((r) => {
+              const email = (r.email || "sin-correo").toLowerCase().trim();
+              if (!groupedByEmail[email]) {
+                groupedByEmail[email] = [];
+              }
+              groupedByEmail[email].push(r);
+            });
+
+            return Object.entries(groupedByEmail).map(([email, groupRestaurants]) => {
+              const isMultiRestaurant = groupRestaurants.length > 1;
+              const ownerName = groupRestaurants[0].owner_name || "Propietario";
+
+              return (
+                <div key={email} className="bg-white rounded-xl border border-border p-5 shadow-sm space-y-4">
+                  {/* Group Header */}
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-border pb-3">
+                    <div className="flex items-center gap-3">
+                      <div className="p-2 bg-accent/5 rounded-lg text-accent">
+                        <Mail className="w-5 h-5" />
+                      </div>
+                      <div>
+                        <h3 className="font-bold text-text text-md flex items-center gap-2">
+                          <span>{email}</span>
+                          {isMultiRestaurant && (
+                            <span className="bg-emerald-500/10 text-emerald-600 border border-emerald-500/20 text-xs font-bold px-2 py-0.5 rounded-full">
+                              Multi-Restaurante ({groupRestaurants.length})
+                            </span>
+                          )}
                         </h3>
-                        {getStatusBadge(restaurant.status)}
-                        {restaurant.subscription_plan &&
-                          getPlanBadge(restaurant.subscription_plan)}
+                        <p className="text-xs text-text-secondary">
+                          Propietario: <strong className="text-text">{ownerName}</strong>
+                        </p>
                       </div>
-                      <p className="text-sm text-text-secondary">
-                        {restaurant.restaurant_type}
-                      </p>
                     </div>
                   </div>
 
-                  {/* Details Grid */}
-                  <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-2 text-sm">
-                    {restaurant.owner_name && (
-                      <div className="flex items-center space-x-2 text-text-secondary">
-                        <StoreIcon className="w-4 h-4" />
-                        <span className="text-text">
-                          {restaurant.owner_name}
-                        </span>
-                      </div>
-                    )}
-                    {restaurant.phone && (
-                      <div className="flex items-center space-x-2 text-text-secondary">
-                        <Phone className="w-4 h-4" />
-                        <a
-                          href={`tel:${restaurant.phone}`}
-                          className="text-accent hover:underline"
+                  {/* Grouped Restaurants */}
+                  <div className="grid gap-3">
+                    {groupRestaurants.map((restaurant) => {
+                      const daysLeft = getTrialDaysLeft(restaurant.trial_ends_at);
+                      return (
+                        <div
+                          key={restaurant.id}
+                          className="bg-bg-subtle hover:bg-border/10 p-4 rounded-lg border border-border/60 transition-colors flex flex-col md:flex-row md:items-center justify-between gap-4"
                         >
-                          {restaurant.phone}
-                        </a>
-                      </div>
-                    )}
-                    {restaurant.email && (
-                      <div className="flex items-center space-x-2 text-text-secondary">
-                        <Mail className="w-4 h-4" />
-                        <a
-                          href={`mailto:${restaurant.email}`}
-                          className="text-accent hover:underline truncate"
-                        >
-                          {restaurant.email}
-                        </a>
-                      </div>
-                    )}
-                    {restaurant.city && (
-                      <div className="flex items-center space-x-2 text-text-secondary">
-                        <MapPin className="w-4 h-4" />
-                        <span>{restaurant.city}</span>
-                      </div>
-                    )}
-                    <div className="flex items-center space-x-2 text-text-secondary">
-                      <Calendar className="w-4 h-4" />
-                      <span>{formatDateTime(restaurant.created_at)}</span>
-                    </div>
+                          <div className="flex-1 space-y-2">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <h4 className="font-bold text-text text-sm flex items-center gap-1.5">
+                                <StoreIcon className="w-4 h-4 text-accent" />
+                                {restaurant.name}
+                              </h4>
+                              {getStatusBadge(restaurant.status)}
+                              {restaurant.subscription_plan &&
+                                getPlanBadge(restaurant.subscription_plan)}
+                              {restaurant.subscription_plan === "free_trial" && (
+                                <Badge variant="warning" className="text-xs">
+                                  Prueba ({daysLeft} días restantes)
+                                </Badge>
+                              )}
+                            </div>
+                            
+                            <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-x-4 gap-y-1 text-xs text-text-secondary">
+                              <p><strong>Tipo:</strong> {restaurant.restaurant_type}</p>
+                              {restaurant.phone && <p><strong>Teléfono:</strong> {restaurant.phone}</p>}
+                              {restaurant.city && <p><strong>Ciudad:</strong> {restaurant.city}</p>}
+                              <p><strong>Registrado:</strong> {formatDateTime(restaurant.created_at)}</p>
+                            </div>
+                          </div>
+
+                          <div className="flex gap-2 items-center md:min-w-[280px]">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              fullWidth
+                              icon={<Eye className="w-4 h-4" />}
+                              onClick={() => handleViewDetails(restaurant)}
+                            >
+                              Ver Ficha
+                            </Button>
+                            <Button
+                              variant={
+                                restaurant.status === "blocked" ? "secondary" : "danger"
+                              }
+                              size="sm"
+                              fullWidth
+                              icon={
+                                restaurant.status === "blocked" ? (
+                                  <CheckCircle className="w-4 h-4" />
+                                ) : (
+                                  <Ban className="w-4 h-4" />
+                                )
+                              }
+                              onClick={() => handleToggleBlock(restaurant)}
+                            >
+                              {restaurant.status === "blocked" ? "Desbloquear" : "Bloquear"}
+                            </Button>
+                          </div>
+                        </div>
+                      );
+                    })}
                   </div>
                 </div>
-
-                {/* Actions */}
-                <div className="flex md:flex-col gap-2 md:min-w-[140px]">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    fullWidth
-                    icon={<Eye className="w-4 h-4" />}
-                    onClick={() => handleViewDetails(restaurant)}
-                  >
-                    Ver Ficha
-                  </Button>
-                  <Button
-                    variant={
-                      restaurant.status === "blocked" ? "secondary" : "danger"
-                    }
-                    size="sm"
-                    fullWidth
-                    icon={
-                      restaurant.status === "blocked" ? (
-                        <CheckCircle className="w-4 h-4" />
-                      ) : (
-                        <Ban className="w-4 h-4" />
-                      )
-                    }
-                    onClick={() => handleToggleBlock(restaurant)}
-                  >
-                    {restaurant.status === "blocked" ? "Desbloquear" : "Bloquear"}
-                  </Button>
-                </div>
-              </div>
-            </Card>
-          ))}
+              );
+            });
+          })()}
         </div>
       )}
 

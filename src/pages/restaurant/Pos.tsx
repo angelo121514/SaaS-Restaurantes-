@@ -355,7 +355,7 @@ const Pos: React.FC = () => {
 
     if (!error) {
       setOrderSuccess(true);
-      if (createdOrder) {
+      if (createdOrder && finalStatus === "completed") {
         setPrintTicketData(createdOrder);
       }
       setCart([]);

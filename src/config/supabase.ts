@@ -233,6 +233,41 @@ class MockSupabaseClient {
             created_at: new Date(Date.now() - 86400000 * 5).toISOString(),
             updated_at: new Date().toISOString(),
           },
+          {
+            id: "demo-restaurant-id-2",
+            registration_request_id: "request-uuid-1",
+            name: "Bella Italia (Sucursal Poniente)",
+            slug: "bella-italia-poniente",
+            owner_name: "Juan Pérez",
+            phone: "987654321",
+            email: "demorestaurant@gmail.com",
+            city: "Santiago",
+            address: "Av. Vitacura 2345",
+            restaurant_type: "Pizzería",
+            subscription_plan: "free_trial",
+            status: "trial",
+            is_active: true,
+            created_at: new Date(Date.now() - 86400000 * 2).toISOString(),
+            trial_ends_at: new Date(Date.now() + 86400000 * 8).toISOString(), // 8 days remaining
+            updated_at: new Date().toISOString(),
+          },
+          {
+            id: "sushi-restaurant-id",
+            registration_request_id: "request-uuid-2",
+            name: "Sushi House",
+            slug: "sushi-house",
+            owner_name: "Kenji Sato",
+            phone: "911223344",
+            email: "owner@sushihouse.com",
+            city: "Viña del Mar",
+            address: "Av. Libertad 450",
+            restaurant_type: "Sushi",
+            subscription_plan: "starter",
+            status: "active",
+            is_active: true,
+            created_at: new Date(Date.now() - 86400000 * 10).toISOString(),
+            updated_at: new Date().toISOString(),
+          }
         ];
       case "users":
         return [
