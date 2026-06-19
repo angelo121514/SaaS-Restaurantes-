@@ -9,7 +9,8 @@ import {
   ShieldCheck, 
   Zap, 
   Check, 
-  HelpCircle 
+  HelpCircle,
+  Copy
 } from "lucide-react";
 import {
   Button,
@@ -20,7 +21,7 @@ import {
 } from "../../components/ui";
 import { APP_CONFIG } from "../../config/config";
 import { supabase } from "../../config/supabase";
-import { isValidEmail } from "../../utils/helpers";
+import { isValidEmail, copyToClipboard } from "../../utils/helpers";
 import { CmorFlowLogo } from "../../components/CmorFlowLogo";
 
 interface FormData {
@@ -33,6 +34,8 @@ interface FormData {
   restaurant_type: string;
   heard_from: string;
   notes: string;
+  password?: string;
+  delivery_channel: "email" | "whatsapp";
 }
 
 const RegisterPage: React.FC = () => {
@@ -40,6 +43,7 @@ const RegisterPage: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [isGoogleSignUp, setIsGoogleSignUp] = useState(false);
+  const [userPassword, setUserPassword] = useState("");
   
   // Registration data
   const [createdRequestId, setCreatedRequestId] = useState("");
@@ -53,6 +57,8 @@ const RegisterPage: React.FC = () => {
     restaurant_type: "",
     heard_from: "",
     notes: "",
+    password: "",
+    delivery_channel: "email",
   });
 
   const [errors, setErrors] = useState<Partial<FormData>>({});
@@ -65,6 +71,7 @@ const RegisterPage: React.FC = () => {
   const [cardExpiry, setCardExpiry] = useState("");
   const [cardCvv, setCardCvv] = useState("");
   const [paymentError, setPaymentError] = useState("");
+
 
   useEffect(() => {
     const checkGoogleSession = async () => {
@@ -154,6 +161,10 @@ const RegisterPage: React.FC = () => {
       newErrors.restaurant_type = "El tipo de restaurante es obligatorio";
     }
 
+    if (formData.password && formData.password.trim().length > 0 && formData.password.trim().length < 6) {
+      newErrors.password = "La contraseña debe tener al menos 6 caracteres";
+    }
+
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
@@ -168,8 +179,18 @@ const RegisterPage: React.FC = () => {
 
     setLoading(true);
 
+    const definedPass = formData.password?.trim() || "";
+    const finalPass = definedPass || `CMOR-${Math.floor(100000 + Math.random() * 900000)}`;
+    setUserPassword(finalPass);
+
     try {
       const requestId = crypto.randomUUID();
+      const notesWithDelivery = [
+        formData.notes?.trim(),
+        `[Canal: ${formData.delivery_channel.toUpperCase()}]`,
+        `[PasswordDefinida: ${definedPass ? "true" : "false"}]`
+      ].filter(Boolean).join("\n");
+
       const { error: insertError } = await supabase
         .from("registration_requests")
         .insert([
@@ -183,7 +204,7 @@ const RegisterPage: React.FC = () => {
             address: formData.address.trim() || null,
             restaurant_type: formData.restaurant_type,
             heard_from: formData.heard_from || null,
-            notes: formData.notes.trim() || null,
+            notes: notesWithDelivery,
             status: "pending",
           },
         ]);
@@ -245,11 +266,35 @@ const RegisterPage: React.FC = () => {
         throw new Error(data[0].message || "Error al activar el restaurante");
       }
 
-      // Invocar la Edge Function para procesar la cola y enviar el email al instante
-      try {
-        await supabase.functions.invoke("invite-owner");
-      } catch (funcErr) {
-        console.error("Error al disparar Edge Function de invitaciones:", funcErr);
+      const createdRestaurantId = data[0].restaurant_id;
+
+      // Register user in Supabase Auth with metadata linking to restaurant
+      const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
+        email: formData.email.toLowerCase(),
+        password: userPassword,
+        options: {
+          data: {
+            full_name: formData.owner_name,
+            role: "owner",
+            restaurant_id: createdRestaurantId,
+          },
+        },
+      });
+
+      if (signUpError) {
+        // If user already exists (retry scenario), don't break the flow
+        if (!signUpError.message.toLowerCase().includes("already registered")) {
+          throw new Error(`Error al registrar credenciales: ${signUpError.message}`);
+        }
+      }
+
+      // If user chose Email and it is not mock mode, invoke the invitation trigger
+      if (formData.delivery_channel === "email" && typeof (supabase as any).auth?.onAuthStateChange === "function") {
+        try {
+          await supabase.functions.invoke("invite-owner");
+        } catch (funcErr) {
+          console.error("Error al disparar Edge Function de invitaciones:", funcErr);
+        }
       }
 
       setStep("success");
@@ -293,85 +338,131 @@ const RegisterPage: React.FC = () => {
   // STEP 3: SUCCESS SCREEN
   // ==========================================
   if (step === "success") {
+    const activePlan = APP_CONFIG.plans[selectedPlan as keyof typeof APP_CONFIG.plans];
+    const isTrial = selectedPlan === "free_trial";
+
+    const handleAutoLogin = async () => {
+      setLoading(true);
+      setError("");
+      try {
+        const { error: loginErr } = await supabase.auth.signInWithPassword({
+          email: formData.email.toLowerCase(),
+          password: userPassword,
+        });
+        if (loginErr) throw loginErr;
+        window.location.href = "/restaurant";
+      } catch (err: any) {
+        console.error("Auto login failed:", err);
+        window.location.href = `/login?email=${encodeURIComponent(formData.email)}`;
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    const whatsappMessage = `¡Hola! Acabo de registrar mi restaurante en Cmor Flow. Mis credenciales de acceso son:\n\n📧 Correo: ${formData.email.toLowerCase()}\n🔑 Contraseña: ${userPassword}\n\nAcceder al panel: ${window.location.origin}/login`;
+    const cleanPhone = formData.phone.replace(/[\s\-()+]/g, "");
+
     return (
       <div className="min-h-screen bg-bg text-text flex items-center justify-center px-4 relative overflow-hidden font-sans transition-colors duration-200">
-        {/* Background Blobs */}
         <div className="absolute top-24 left-1/4 w-96 h-96 bg-red-600/10 rounded-full filter blur-[100px] pointer-events-none z-0" />
         <div className="absolute bottom-24 right-1/4 w-96 h-96 bg-amber-500/5 rounded-full filter blur-[100px] pointer-events-none z-0" />
 
         <div className="max-w-lg w-full text-center flex flex-col items-center bg-bg-subtle/90 backdrop-blur-md border border-border p-8 rounded-2xl shadow-2xl relative z-10 space-y-6">
-          <div className="inline-flex items-center justify-center w-20 h-20 rounded-full bg-emerald-500/10 border border-emerald-500/25 mb-2">
+          <div className="inline-flex items-center justify-center w-20 h-20 rounded-full bg-emerald-500/10 border border-emerald-500/25 mb-2 animate-bounce">
             <CheckCircle className="w-12 h-12 text-emerald-500" />
           </div>
           
           <h1 className="text-2xl font-extrabold text-text tracking-tight">
-            ¡Suscripción y Cuenta Activadas!
+            {isTrial ? "¡Cuenta Demo Activada!" : "¡Suscripción y Cuenta Activadas!"}
           </h1>
           
           <p className="text-text-secondary text-sm leading-relaxed">
-            {isGoogleSignUp ? (
-              <span>
-                ¡Felicitaciones! Tu restaurante <strong className="text-text">{formData.restaurant_name}</strong> ha sido activado y vinculado a tu cuenta de Google. Ya puedes comenzar a utilizar el sistema inmediatamente.
-              </span>
-            ) : (
-              <span>
-                El pago de tu plan <strong className="text-text">{APP_CONFIG.plans[selectedPlan as keyof typeof APP_CONFIG.plans]?.name}</strong> se ha procesado exitosamente. Hemos enviado un correo electrónico de invitación a <strong className="text-text">{formData.email}</strong> para que configures tu contraseña y accedas.
-              </span>
-            )}
+            Tu restaurante <strong className="text-text">{formData.restaurant_name}</strong> ha sido registrado con éxito. 
+            {isTrial 
+              ? " Tu período de prueba de 30 días ha comenzado. " 
+              : ` El pago de tu plan ${activePlan?.name} fue procesado correctamente.`}
           </p>
 
-          <div className="space-y-4 w-full pt-2">
-            <div className="bg-bg border border-border rounded-xl p-5 text-left">
-              <h3 className="font-semibold text-text mb-3 flex items-center space-x-1.5 text-sm">
+          <div className="space-y-4 w-full text-left">
+            {/* Credentials Card */}
+            <div className="bg-bg border border-border rounded-xl p-5 space-y-3">
+              <h3 className="font-bold text-text text-sm flex items-center gap-1.5 border-b border-border pb-2">
                 <Sparkles className="w-4 h-4 text-amber-500" />
-                <span>¿Cómo ingresar al sistema?</span>
+                <span>Credenciales de Acceso</span>
               </h3>
               
-              <ul className="space-y-3 text-xs sm:text-sm text-text-secondary">
-                {isGoogleSignUp ? (
-                  <li className="flex items-start">
-                    <span className="text-red-500 font-bold mr-2">✓</span>
-                    <span>Presiona el botón "Ir al Panel" a continuación. Iniciarás sesión directamente con tu cuenta de Google.</span>
-                  </li>
-                ) : (
-                  <>
-                    <li className="flex items-start">
-                      <span className="text-red-500 font-bold mr-2">1.</span>
-                      <span>Busca en tu bandeja de entrada el correo con asunto <strong>"Tu acceso a CMOR FLOW"</strong>.</span>
-                    </li>
-                    <li className="flex items-start">
-                      <span className="text-red-500 font-bold mr-2">2.</span>
-                      <span>Haz clic en el botón de confirmación en el correo para crear tu contraseña segura.</span>
-                    </li>
-                  </>
-                )}
-                <li className="flex items-start">
-                  <span className="text-red-500 font-bold mr-2">{isGoogleSignUp ? "✓" : "3."}</span>
-                  <span>Podrás configurar tu menú, generar tu código QR y comenzar a recibir pedidos en tu local.</span>
-                </li>
-              </ul>
+              <div className="space-y-2 text-xs sm:text-sm">
+                <div className="flex justify-between items-center bg-bg-subtle/50 p-2 rounded border border-border/50">
+                  <span className="text-text-secondary">Correo:</span>
+                  <div className="flex items-center gap-2">
+                    <span className="font-mono text-text font-semibold">{formData.email.toLowerCase()}</span>
+                    <button 
+                      onClick={() => copyToClipboard(formData.email.toLowerCase())}
+                      className="text-red-500 hover:text-red-600 transition-colors p-1"
+                      title="Copiar Correo"
+                    >
+                      <Copy className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                </div>
+
+                <div className="flex justify-between items-center bg-bg-subtle/50 p-2 rounded border border-border/50">
+                  <span className="text-text-secondary">Contraseña:</span>
+                  <div className="flex items-center gap-2">
+                    <span className="font-mono text-text font-semibold">{userPassword}</span>
+                    <button 
+                      onClick={() => copyToClipboard(userPassword)}
+                      className="text-red-500 hover:text-red-600 transition-colors p-1"
+                      title="Copiar Contraseña"
+                    >
+                      <Copy className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                </div>
+              </div>
             </div>
 
-            {isGoogleSignUp ? (
-              <Button 
-                onClick={() => window.location.href = "/restaurant"}
-                fullWidth
-                size="lg"
-                className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold transition-all border-0 shadow-lg"
-              >
-                Ir a mi Panel de Restaurant
-              </Button>
-            ) : (
-              <Link to="/login" className="block w-full">
-                <Button 
-                  fullWidth
-                  size="lg"
-                  className="bg-red-600 hover:bg-red-700 text-white font-bold transition-all border-0 shadow-lg"
+            {/* Notification Delivery Info */}
+            {formData.delivery_channel === "whatsapp" ? (
+              <div className="space-y-3">
+                <p className="text-xs text-text-secondary">
+                  Como elegiste recibir tus accesos por WhatsApp, puedes pulsar el botón de abajo para enviar las credenciales a tu chat y guardarlas.
+                </p>
+                <a 
+                  href={`https://wa.me/${cleanPhone}?text=${encodeURIComponent(whatsappMessage)}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="block w-full"
                 >
-                  Ir al Inicio de Sesión
-                </Button>
-              </Link>
+                  <Button 
+                    fullWidth
+                    size="lg"
+                    className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold transition-all border-0 shadow-lg flex items-center justify-center gap-2"
+                  >
+                    <svg className="w-5 h-5 fill-current" viewBox="0 0 24 24">
+                      <path d="M12.031 2c-5.514 0-9.989 4.443-9.989 9.924 0 2.096.654 4.041 1.765 5.67l-1.15 4.218 4.364-1.127a9.924 9.924 0 004.981 1.341c5.512 0 9.988-4.443 9.988-9.924C22 6.443 17.525 2 12.031 2zm0 18.06c-1.8 0-3.486-.514-4.93-1.405l-.353-.217-2.613.675.696-2.557-.253-.399a8.106 8.106 0 01-1.343-4.57c0-4.52 3.693-8.196 8.232-8.196 4.538 0 8.231 3.676 8.231 8.196s-3.692 8.196-8.231 8.196zm4.846-5.834c-.266-.131-1.571-.762-1.815-.849-.243-.087-.421-.131-.599.131-.177.262-.689.849-.846 1.025-.156.175-.314.197-.579.066-.266-.131-1.122-.407-2.138-1.298-.79-.693-1.324-1.549-1.479-1.811-.156-.262-.016-.404.116-.534.12-.117.266-.306.399-.459.132-.153.177-.262.266-.437.089-.175.044-.328-.022-.459-.066-.131-.599-1.42-.821-1.944-.217-.514-.455-.443-.623-.451-.157-.008-.337-.009-.517-.009a.994.994 0 00-.719.328c-.244.262-.931.896-.931 2.186 0 1.29.954 2.535 1.087 2.71.133.175 1.878 2.825 4.55 3.953.636.269 1.132.429 1.519.55.639.2 1.22.172 1.68.104.512-.076 1.571-.634 1.792-1.246.222-.612.222-1.137.156-1.246-.067-.109-.244-.175-.51-.306z"/>
+                    </svg>
+                    <span>Enviar a mi WhatsApp</span>
+                  </Button>
+                </a>
+              </div>
+            ) : (
+              <div className="bg-red-500/5 border border-red-500/10 rounded-xl p-4 text-xs text-text-secondary leading-relaxed">
+                ¡Perfecto! Hemos registrado tu canal preferido. Si estás en modo real, se ha enviado un correo corporativo personalizado con el logotipo de Cmor Flow a <strong className="text-text">{formData.email}</strong>. Puedes utilizar las credenciales de arriba para acceder inmediatamente.
+              </div>
             )}
+          </div>
+
+          <div className="w-full pt-2">
+            <Button 
+              onClick={handleAutoLogin}
+              loading={loading}
+              fullWidth
+              size="lg"
+              className="bg-red-600 hover:bg-red-700 text-white font-bold transition-all border-0 shadow-lg flex items-center justify-center gap-2"
+            >
+              <span>Entrar al Panel de Restaurant</span>
+            </Button>
           </div>
         </div>
       </div>
@@ -523,113 +614,65 @@ const RegisterPage: React.FC = () => {
                   </Button>
                 </div>
               ) : (
-                // Credit Card Simulation UI
+                // Transbank Webpay Plus Portal Simulation
                 <div className="space-y-6">
                   <div className="border-b border-border pb-3 flex justify-between items-center">
                     <h2 className="text-base font-bold text-text flex items-center space-x-2">
-                      <CreditCard className="w-5 h-5 text-red-500" />
-                      <span>Pago en Línea con Tarjeta</span>
+                      <span className="w-2.5 h-2.5 rounded-full bg-red-600 animate-ping" />
+                      <span className="text-red-600 font-extrabold tracking-wide">Webpay Plus (Transbank)</span>
                     </h2>
                     <span className="text-xs text-text-secondary bg-bg px-2.5 py-1 border border-border rounded-full flex items-center">
-                      <Lock className="w-3 h-3 text-emerald-500 mr-1" /> Transacción Encriptada
+                      <Lock className="w-3 h-3 text-emerald-500 mr-1" /> Portal Seguro Transbank
                     </span>
                   </div>
 
-                  {/* Visual Credit Card Mockup */}
-                  <div className="max-w-sm mx-auto w-full aspect-[1.586/1] bg-gradient-to-br from-zinc-800 via-zinc-900 to-black border border-zinc-700/50 rounded-xl p-5 text-white flex flex-col justify-between shadow-xl relative overflow-hidden transition-all duration-300">
-                    <div className="absolute -top-10 -right-10 w-40 h-40 bg-red-600/10 rounded-full filter blur-3xl pointer-events-none" />
-                    <div className="flex justify-between items-start">
-                      <div className="space-y-1">
-                        <p className="text-[10px] text-zinc-400 font-bold uppercase tracking-widest">Socio Proveedor</p>
-                        <CmorFlowLogo size="sm" showText={false} />
-                      </div>
-                      <div className="h-6 w-9 bg-zinc-700/50 rounded opacity-85" />
+                  <div className="bg-bg border border-border rounded-xl p-5 space-y-4">
+                    <div className="flex justify-between items-center text-sm border-b border-border pb-3">
+                      <span className="text-text-secondary">Comercio:</span>
+                      <strong className="text-text font-bold">Cmor Flow SaaS</strong>
                     </div>
-                    <div className="space-y-2">
-                      <p className="font-mono text-lg tracking-widest text-center text-zinc-200">
-                        {cardNumber || "•••• •••• •••• ••••"}
-                      </p>
+                    <div className="flex justify-between items-center text-sm border-b border-border pb-3">
+                      <span className="text-text-secondary">Plan Solicitado:</span>
+                      <strong className="text-text uppercase font-semibold">{activePlan?.name}</strong>
                     </div>
-                    <div className="flex justify-between items-end">
-                      <div className="space-y-0.5">
-                        <p className="text-[8px] text-zinc-500 font-bold uppercase tracking-wider">Titular de Tarjeta</p>
-                        <p className="font-medium text-xs tracking-wider uppercase text-zinc-300 truncate max-w-[150px]">
-                          {cardName || "NOMBRE TITULAR"}
-                        </p>
-                      </div>
-                      <div className="flex space-x-4">
-                        <div className="space-y-0.5">
-                          <p className="text-[8px] text-zinc-500 font-bold uppercase tracking-wider">Vence</p>
-                          <p className="font-mono text-xs text-zinc-300">{cardExpiry || "MM/AA"}</p>
-                        </div>
-                        <div className="space-y-0.5">
-                          <p className="text-[8px] text-zinc-500 font-bold uppercase tracking-wider">CVV</p>
-                          <p className="font-mono text-xs text-zinc-300">{cardCvv || "•••"}</p>
-                        </div>
-                      </div>
+                    <div className="flex justify-between items-center text-sm border-b border-border pb-3">
+                      <span className="text-text-secondary">Orden de Compra:</span>
+                      <span className="font-mono text-text text-xs">{createdRequestId.substring(0, 8).toUpperCase()}</span>
+                    </div>
+                    <div className="flex justify-between items-center text-lg pt-1">
+                      <span className="text-text font-semibold">Total a Pagar:</span>
+                      <strong className="text-red-500 font-black text-xl">
+                        {APP_CONFIG.defaultCurrency} {activePlan?.price.toLocaleString("es-CL")}
+                      </strong>
                     </div>
                   </div>
 
-                  {/* Form fields */}
-                  <div className="space-y-4">
-                    <Input
-                      label="Número de la Tarjeta"
-                      name="cardNumber"
-                      value={cardNumber}
-                      onChange={handleCardNumberChange}
-                      placeholder="4000 1234 5678 9010"
-                      maxLength={19}
-                      icon={<CreditCard className="w-4 h-4" />}
-                      required
-                    />
-
-                    <Input
-                      label="Nombre del Titular"
-                      name="cardName"
-                      value={cardName}
-                      onChange={(e) => setCardName(e.target.value.substring(0, 30))}
-                      placeholder="Como aparece en la tarjeta"
-                      required
-                    />
-
-                    <div className="grid grid-cols-2 gap-4">
-                      <Input
-                        label="Fecha de Vencimiento"
-                        name="cardExpiry"
-                        value={cardExpiry}
-                        onChange={handleExpiryChange}
-                        placeholder="MM/AA"
-                        maxLength={5}
-                        required
-                      />
-
-                      <Input
-                        label="Código de Seguridad (CVV)"
-                        name="cardCvv"
-                        type="password"
-                        value={cardCvv}
-                        onChange={(e) => setCardCvv(e.target.value.replace(/\D/g, "").substring(0, 4))}
-                        placeholder="123"
-                        maxLength={4}
-                        required
-                      />
-                    </div>
+                  <div className="bg-red-500/5 border border-red-500/10 rounded-xl p-4 text-xs text-text-secondary leading-relaxed">
+                    Serás redirigido al portal simulado de Transbank para autorizar el cargo. Una vez procesado, el comercio activará tu panel y credenciales al instante.
                   </div>
 
-                  {/* Payment Button */}
-                  <Button 
-                    type="submit" 
-                    loading={paymentLoading} 
-                    fullWidth 
-                    size="lg"
-                    className="bg-red-600 hover:bg-red-700 text-white font-bold transition-all border-0 shadow-lg flex items-center justify-center space-x-2"
-                  >
-                    <span>Simular Pago Seguro de {APP_CONFIG.defaultCurrency} {activePlan?.price.toLocaleString("es-CL")}</span>
-                  </Button>
-
-                  <div className="flex items-center justify-center space-x-1 text-xs text-text-secondary">
-                    <ShieldCheck className="w-3.5 h-3.5 text-emerald-500" />
-                    <span>Conexión cifrada de 256 bits mediante pasarela integrada.</span>
+                  <div className="grid grid-cols-2 gap-4">
+                    <Button
+                      type="submit"
+                      loading={paymentLoading}
+                      fullWidth
+                      size="lg"
+                      className="bg-red-600 hover:bg-red-700 text-white font-bold transition-all border-0 shadow-lg"
+                    >
+                      Pagar (Simular Éxito)
+                    </Button>
+                    <Button
+                      type="button"
+                      onClick={() => {
+                        setPaymentError("Transacción rechazada por el usuario en el portal de Webpay.");
+                      }}
+                      variant="outline"
+                      fullWidth
+                      size="lg"
+                      className="border-border hover:bg-bg-subtle text-text"
+                    >
+                      Cancelar Transacción
+                    </Button>
                   </div>
                 </div>
               )}
@@ -809,6 +852,52 @@ const RegisterPage: React.FC = () => {
                     readOnly={isGoogleSignUp}
                     className={isGoogleSignUp ? "opacity-75 bg-bg-subtle cursor-not-allowed" : ""}
                   />
+
+                  {!isGoogleSignUp && (
+                    <Input
+                      label="Contraseña"
+                      name="password"
+                      type="password"
+                      value={formData.password || ""}
+                      onChange={handleChange}
+                      error={errors.password}
+                      placeholder="Mínimo 6 caracteres (Opcional, se auto-generará si se deja en blanco)"
+                    />
+                  )}
+
+                  <div className="md:col-span-2">
+                    <label className="block text-sm font-semibold text-text-secondary mb-2">
+                      ¿Cómo prefieres recibir tus credenciales de acceso?
+                    </label>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div
+                        onClick={() => setFormData(prev => ({ ...prev, delivery_channel: "email" }))}
+                        className={`border rounded-xl p-4 flex items-center justify-between cursor-pointer transition-all ${
+                          formData.delivery_channel === "email"
+                            ? "bg-red-500/10 border-red-500 text-red-500"
+                            : "bg-bg border-border text-text-secondary hover:border-text-secondary"
+                        }`}
+                      >
+                        <span className="font-semibold text-sm">Correo Electrónico</span>
+                        <div className={`w-4 h-4 rounded-full border flex items-center justify-center ${formData.delivery_channel === "email" ? "border-red-500" : "border-border"}`}>
+                          {formData.delivery_channel === "email" && <div className="w-2 h-2 rounded-full bg-red-500" />}
+                        </div>
+                      </div>
+                      <div
+                        onClick={() => setFormData(prev => ({ ...prev, delivery_channel: "whatsapp" }))}
+                        className={`border rounded-xl p-4 flex items-center justify-between cursor-pointer transition-all ${
+                          formData.delivery_channel === "whatsapp"
+                            ? "bg-emerald-500/10 border-emerald-500 text-emerald-500"
+                            : "bg-bg border-border text-text-secondary hover:border-text-secondary"
+                        }`}
+                      >
+                        <span className="font-semibold text-sm">WhatsApp (Gratuito)</span>
+                        <div className={`w-4 h-4 rounded-full border flex items-center justify-center ${formData.delivery_channel === "whatsapp" ? "border-emerald-500" : "border-border"}`}>
+                          {formData.delivery_channel === "whatsapp" && <div className="w-2 h-2 rounded-full bg-emerald-500" />}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>

@@ -170,6 +170,99 @@ class MockSupabaseClient {
       localStorage.removeItem("mock_supabase_session");
       return { error: null };
     },
+    signInWithPassword: async (params: { email: string; password?: string }) => {
+      console.log("Mock signInWithPassword called with:", params.email);
+      const usersStore = JSON.parse(localStorage.getItem("mock_db_users") || "[]");
+      const adminUsersStore = JSON.parse(localStorage.getItem("mock_db_admin_users") || "[]");
+      const profilesStore = JSON.parse(localStorage.getItem("mock_db_profiles") || "[]");
+      
+      const admin = adminUsersStore.find(
+        (au: any) => au.email.toLowerCase() === params.email.toLowerCase()
+      );
+      if (admin) {
+        const mockSession = {
+          user: {
+            id: admin.id,
+            email: admin.email,
+            user_metadata: { full_name: admin.name, role: "admin" },
+          },
+          access_token: "mock-admin-token",
+        };
+        localStorage.setItem("mock_supabase_session", JSON.stringify(mockSession));
+        return { data: { user: mockSession.user, session: mockSession }, error: null };
+      }
+
+      const dbUser = usersStore.find((u: any) => u.email.toLowerCase() === params.email.toLowerCase());
+      if (dbUser) {
+        const profile = profilesStore.find((p: any) => p.id === dbUser.id);
+        const mockSession = {
+          user: {
+            id: dbUser.id,
+            email: dbUser.email,
+            user_metadata: { 
+              full_name: profile?.display_name || dbUser.email.split("@")[0], 
+              role: dbUser.role,
+              restaurant_id: dbUser.restaurant_id
+            },
+          },
+          access_token: "mock-user-token",
+        };
+        localStorage.setItem("mock_supabase_session", JSON.stringify(mockSession));
+        return { data: { user: mockSession.user, session: mockSession }, error: null };
+      }
+
+      return { data: { user: null, session: null }, error: { message: "Invalid login credentials in mock mode" } };
+    },
+    signUp: async (params: { email: string; password?: string; options?: { data?: any } }) => {
+      console.log("Mock signUp called with:", params.email);
+      const newUserId = "user-" + Math.random().toString(36).substring(2, 9);
+      const email = params.email;
+      const metadata = params.options?.data || {};
+      
+      const usersStore = JSON.parse(localStorage.getItem("mock_db_users") || "[]");
+      const updatedUsers = [
+        ...usersStore,
+        {
+          id: newUserId,
+          restaurant_id: metadata.restaurant_id || null,
+          email: email,
+          password_hash: params.password || "default-hash",
+          role: metadata.role || "owner",
+          created_at: new Date().toISOString(),
+        }
+      ];
+      localStorage.setItem("mock_db_users", JSON.stringify(updatedUsers));
+
+      const profilesStore = JSON.parse(localStorage.getItem("mock_db_profiles") || "[]");
+      const updatedProfiles = [
+        ...profilesStore,
+        {
+          id: newUserId,
+          restaurant_id: metadata.restaurant_id || null,
+          role: metadata.role || "owner",
+          display_name: metadata.full_name || email.split("@")[0],
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        }
+      ];
+      localStorage.setItem("mock_db_profiles", JSON.stringify(updatedProfiles));
+
+      const mockSession = {
+        user: {
+          id: newUserId,
+          email: email,
+          user_metadata: {
+            full_name: metadata.full_name || email.split("@")[0],
+            role: metadata.role || "owner",
+            restaurant_id: metadata.restaurant_id || null,
+          }
+        },
+        access_token: "mock-signup-token"
+      };
+      
+      localStorage.setItem("mock_supabase_session", JSON.stringify(mockSession));
+      return { data: { user: mockSession.user, session: mockSession }, error: null };
+    },
   };
 
   private getStore(table: string): any[] {
@@ -666,6 +759,55 @@ class MockSupabaseClient {
       this.setStore("registration_requests", updatedRequests);
       return Promise.resolve({ data: true, error: null });
     }
+
+    if (fnName === "auto_approve_registration_v2") {
+      const req = requests.find((r) => r.id === params.p_request_id);
+      if (!req) {
+        return Promise.resolve({ data: null, error: { message: "Solicitud no encontrada" } });
+      }
+
+      const newRestaurantId = "rest-" + Math.random().toString(36).substring(2, 9);
+      
+      const updatedRequests = requests.map((r) => {
+        if (r.id === params.p_request_id) {
+          return {
+            ...r,
+            status: "verified",
+            contacted_at: new Date().toISOString(),
+            internal_notes: `Aprobado automáticamente via plan ${params.p_plan} (Mock)`,
+          };
+        }
+        return r;
+      });
+      this.setStore("registration_requests", updatedRequests);
+
+      const updatedRestaurants = [
+        ...restaurants,
+        {
+          id: newRestaurantId,
+          registration_request_id: params.p_request_id,
+          name: req.restaurant_name,
+          slug: req.restaurant_name.toLowerCase().replace(/[^a-z0-9]+/g, "-"),
+          owner_name: req.owner_name,
+          phone: req.phone,
+          email: req.email,
+          city: req.city,
+          address: req.address,
+          subscription_plan: params.p_plan,
+          status: "active",
+          is_active: true,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        },
+      ];
+      this.setStore("restaurants", updatedRestaurants);
+
+      return Promise.resolve({
+        data: [{ restaurant_id: newRestaurantId, success: true, message: "Restaurante activado con éxito" }],
+        error: null,
+      });
+    }
+
 
     if (fnName === "admin_toggle_restaurant_status") {
       const updatedRestaurants = restaurants.map((r) => {

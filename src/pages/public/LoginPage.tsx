@@ -181,13 +181,13 @@ const LoginPage: React.FC = () => {
         if (profile.restaurant_id) {
           const { data: rest } = await supabase
             .from("restaurants")
-            .select("is_active")
+            .select("is_active, block_reason")
             .eq("id", profile.restaurant_id)
             .single();
           if (rest && rest.is_active === false) {
             await supabase.auth.signOut();
             setError(
-              "Tu cuenta de restaurante ha sido desactivada. Por favor contacta al soporte de CMOR FLOW."
+              `Tu cuenta de restaurante ha sido desactivada temporalmente. Motivo: ${rest.block_reason || "No especificado"}. Por favor contacta al soporte de CMOR FLOW.`
             );
             setLoading(false);
             return;
