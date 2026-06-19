@@ -202,7 +202,7 @@ CREATE POLICY "Owners manage their logos" ON storage.objects
   FOR ALL TO authenticated USING (
     bucket_id IN ('logos','qr-codes')
     AND public.is_my_restaurant(
-      (storage.foldername(name))::uuid
+      ((storage.foldername(name))[1])::uuid
     )
   );
 
@@ -362,7 +362,7 @@ BEGIN
   WITH d AS (
     DELETE FROM public.audit_log
     WHERE created_at < now() - interval '24 months'
-      AND action NOT IN ('login_failed','rls_denied','security_event','breach_detected')
+      AND audit_log.action NOT IN ('login_failed','rls_denied','security_event','breach_detected')
     RETURNING 1
   )
   SELECT count(*) INTO v_deleted FROM d;
@@ -371,7 +371,7 @@ BEGIN
   WITH d AS (
     DELETE FROM public.audit_log
     WHERE created_at < now() - interval '36 months'
-      AND action IN ('login_failed','rls_denied','security_event','breach_detected')
+      AND audit_log.action IN ('login_failed','rls_denied','security_event','breach_detected')
     RETURNING 1
   )
   SELECT count(*) INTO v_deleted FROM d;
@@ -447,7 +447,7 @@ DO $$
 DECLARE
   v_jobid bigint;
 BEGIN
-  SELECT jobid INTO v_jobid FROM cron.jobs WHERE jobname = 'retention_sweep_weekly';
+  SELECT jobid INTO v_jobid FROM cron.job WHERE jobname = 'retention_sweep_weekly';
   IF v_jobid IS NOT NULL THEN
     PERFORM cron.unschedule(v_jobid);
   END IF;
@@ -526,7 +526,7 @@ GRANT EXECUTE ON FUNCTION public.security_check_admin_users_grants()  TO service
 -- Esperado: 4 filas.
 
 -- 3. El schedule de pg_cron quedó activo:
--- SELECT jobname, active FROM cron.jobs WHERE jobname='retention_sweep_weekly';
+-- SELECT jobname, active FROM cron.job WHERE jobname='retention_sweep_weekly';
 -- Esperado: active=true.
 
 -- 4. Buckets de storage son privados:

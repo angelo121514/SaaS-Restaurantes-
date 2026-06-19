@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { Users, Phone, Mail, FileText, Plus, Search, Heart, User, Clock } from "lucide-react";
+import { Users, Phone, Mail, FileText, Plus, Search, Heart, User, Clock, ShoppingBag } from "lucide-react";
 import { Card, Button, Input, Badge, Modal, Textarea } from "../../components/ui";
 import { getCustomers, updateCustomer } from "../../services/restaurantService";
 import { useRestaurantId } from "../../hooks/useAuth";
@@ -14,6 +14,14 @@ interface Customer {
   lastVisit: string;
   favoriteDish: string;
   notes?: string;
+  lastSixPurchases?: {
+    id: string;
+    order_number: string;
+    total: number;
+    created_at: string;
+    payment_method?: string;
+    items: string;
+  }[];
 }
 
 export const Crm: React.FC = () => {
@@ -64,6 +72,18 @@ export const Crm: React.FC = () => {
         }
       }
       
+      const lastSixPurchases = completedOrders
+        .sort((a: any, b: any) => new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime())
+        .slice(0, 6)
+        .map((o: any) => ({
+          id: o.id,
+          order_number: o.order_number,
+          total: parseFloat(o.total || 0),
+          created_at: o.created_at,
+          payment_method: o.payment_method,
+          items: Array.isArray(o.items) ? o.items.map((i: any) => `${i.quantity}x ${i.name}`).join(", ") : "Sin detalle"
+        }));
+
       return {
         id: c.id,
         name: c.name,
@@ -74,6 +94,7 @@ export const Crm: React.FC = () => {
         totalSpent,
         lastVisit,
         favoriteDish,
+        lastSixPurchases,
       };
     });
     
@@ -193,6 +214,33 @@ export const Crm: React.FC = () => {
                       <div className="p-3 bg-bg-subtle rounded-lg border border-border text-sm text-text-secondary italic flex gap-1.5 items-start">
                         <FileText className="w-4 h-4 text-text-secondary/70 flex-shrink-0 mt-0.5" />
                         <p>{customer.notes}</p>
+                      </div>
+                    )}
+
+                    {/* Últimas 6 Compras */}
+                    {customer.lastSixPurchases && customer.lastSixPurchases.length > 0 && (
+                      <div className="mt-4 space-y-2 border-t border-dashed border-border pt-3">
+                        <p className="text-xs font-bold text-text-secondary flex items-center gap-1.5">
+                          <ShoppingBag className="w-3.5 h-3.5 text-accent" />
+                          Últimas {customer.lastSixPurchases.length} compras:
+                        </p>
+                        <div className="grid sm:grid-cols-2 gap-2">
+                          {customer.lastSixPurchases.map((purchase) => (
+                            <div key={purchase.id} className="p-2 bg-bg-subtle rounded border border-border text-xs flex flex-col justify-between gap-1">
+                              <div className="flex justify-between items-center gap-2">
+                                <span className="font-semibold text-text">{purchase.order_number}</span>
+                                <span className="text-[10px] text-text-secondary">{new Date(purchase.created_at).toLocaleDateString("es-CL")}</span>
+                              </div>
+                              <p className="text-text-secondary truncate" title={purchase.items}>
+                                {purchase.items}
+                              </p>
+                              <div className="flex justify-between items-center mt-1 border-t border-border/40 pt-1">
+                                <span className="text-accent font-bold">${purchase.total.toLocaleString("es-CL")}</span>
+                                <span className="text-[10px] text-text-secondary uppercase">{purchase.payment_method === "cash" ? "Efectivo" : purchase.payment_method === "card" ? "Tarjeta" : "Transf."}</span>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
                       </div>
                     )}
                   </div>

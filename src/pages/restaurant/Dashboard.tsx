@@ -16,6 +16,7 @@ import {
   Users,
   BrainCircuit,
   Calculator,
+  ShieldCheck,
 } from "lucide-react";
 import RestaurantHome from "./RestaurantHome";
 import Orders from "./Orders";
@@ -25,6 +26,8 @@ import RestaurantSettings from "./RestaurantSettings";
 import Crm from "./Crm";
 import AiRecommendations from "./AiRecommendations";
 import Pos from "./Pos";
+import Privacy from "./Privacy";
+import { FirstLoginPrivacyModal } from "../../components/privacy/FirstLoginPrivacyModal";
 import { CmorFlowLogo } from "../../components/CmorFlowLogo";
 import { ThemeToggle } from "../../components/ThemeToggle";
 import { supabase } from "../../config/authClient";
@@ -34,6 +37,13 @@ const RestaurantDashboard: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const { user, restaurant, loading } = useAuth();
+
+  const getTrialDaysLeft = (endsAt?: string) => {
+    if (!endsAt) return 0;
+    const diff = new Date(endsAt).getTime() - Date.now();
+    const days = Math.ceil(diff / (1000 * 60 * 60 * 24));
+    return days > 0 ? days : 0;
+  };
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
@@ -65,6 +75,9 @@ const RestaurantDashboard: React.FC = () => {
     );
   }
 
+  // Privacy (panel del titular: consentimientos + DSAR)
+  navItems.push({ path: "/restaurant/privacy", icon: ShieldCheck, label: "Privacidad" });
+
   // Settings is always last
   navItems.push({ path: "/restaurant/settings", icon: Settings, label: "Configuración" });
 
@@ -77,9 +90,30 @@ const RestaurantDashboard: React.FC = () => {
             <div className="flex items-center space-x-4">
               <CmorFlowLogo size="sm" showText={false} />
               <div>
-                <h1 className="text-md font-bold text-text">
-                  {restaurant?.name || "Restaurante"}
-                </h1>
+                <div className="flex items-center gap-2">
+                  <h1 className="text-md font-extrabold text-text">
+                    {restaurant?.name || "Restaurante"}
+                  </h1>
+                  {restaurant && (
+                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${
+                      restaurant.subscription_plan === "free_trial"
+                        ? "bg-amber-500/10 text-amber-600 border-amber-500/20"
+                        : restaurant.subscription_plan === "pro"
+                        ? "bg-success/10 text-success border-success/20"
+                        : "bg-bg-subtle text-text-secondary border-border"
+                    }`}>
+                      {restaurant.subscription_plan === "free_trial"
+                        ? `Prueba (${getTrialDaysLeft(restaurant.trial_ends_at)} días)`
+                        : restaurant.subscription_plan === "starter"
+                        ? "Starter"
+                        : restaurant.subscription_plan === "pro"
+                        ? "Pro"
+                        : restaurant.subscription_plan === "enterprise"
+                        ? "Enterprise"
+                        : restaurant.subscription_plan}
+                    </span>
+                  )}
+                </div>
                 <p className="text-xs text-text-secondary">{user.email}</p>
               </div>
             </div>
@@ -132,9 +166,13 @@ const RestaurantDashboard: React.FC = () => {
           <Route path="reports" element={<Reports />} />
           <Route path="crm" element={<Crm />} />
           <Route path="ai" element={<AiRecommendations />} />
+          <Route path="privacy" element={<Privacy />} />
           <Route path="settings" element={<RestaurantSettings />} />
         </Routes>
       </div>
+
+      {/* Aviso de privacidad obligatorio al primer login (Ley 21.719) */}
+      <FirstLoginPrivacyModal />
 
       {/* Footer Branding */}
       <footer className="py-6 border-t border-border mt-12 text-center text-xs text-text-secondary flex flex-col items-center gap-1">

@@ -35,6 +35,31 @@ interface CartItem extends MenuItem {
   itemTotal: number;
 }
 
+const getItemTags = (item: MenuItem) => {
+  const tags: { label: string; colorClass: string }[] = [];
+  const text = ((item.name || "") + " " + (item.description || "")).toLowerCase();
+  
+  if (text.includes("vegano") || text.includes("vegan")) {
+    tags.push({ label: "Vegano", colorClass: "bg-emerald-50 text-emerald-700 border-emerald-100" });
+  } else if (text.includes("vegetari") || text.includes("margherita") || text.includes("queso")) {
+    tags.push({ label: "Vegetariano", colorClass: "bg-green-50 text-green-700 border-green-100" });
+  }
+  
+  if (text.includes("sin gluten") || text.includes("gluten-free") || text.includes("celiac")) {
+    tags.push({ label: "Sin Gluten", colorClass: "bg-sky-50 text-sky-700 border-sky-100" });
+  }
+  
+  if (text.includes("picante") || text.includes("ají") || text.includes("hot") || text.includes("chili")) {
+    tags.push({ label: "🌶️ Picante", colorClass: "bg-rose-50 text-rose-700 border-rose-100" });
+  }
+  
+  if (text.includes("chef") || text.includes("recomend") || text.includes("especial") || text.includes("pizza margherita") || text.includes("vegana")) {
+    tags.push({ label: "⭐ Destacado", colorClass: "bg-amber-50 text-amber-700 border-amber-100" });
+  }
+  
+  return tags;
+};
+
 const CustomerMenu: React.FC = () => {
   const { slug } = useParams<{ slug: string }>();
   const [restaurant, setRestaurant] = useState<any>(null);
@@ -205,57 +230,86 @@ const CustomerMenu: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-gray-50 pb-24">
-      {/* Header */}
-      <div className="bg-white shadow-sm sticky top-0 z-40">
-        <div className="max-w-screen-lg mx-auto px-4 py-3">
-          <div className="flex items-center gap-3 mb-3">
+      {/* Cover Banner */}
+      <div className="h-44 bg-gradient-to-r from-rose-500 via-orange-500 to-amber-500 relative overflow-hidden">
+        <div className="absolute inset-0 bg-black/20" />
+        <div className="absolute -bottom-1 left-0 right-0 h-8 bg-gradient-to-t from-gray-50 to-transparent" />
+        {/* Subtle grid pattern overlay */}
+        <div className="absolute inset-0 opacity-10 bg-[radial-gradient(#fff_1px,transparent_1px)] [background-size:16px_16px]" />
+      </div>
+
+      {/* Restaurant Info Panel */}
+      <div className="max-w-screen-lg mx-auto px-4 -mt-16 relative z-10 mb-6">
+        <div className="bg-white rounded-2xl p-5 shadow-lg border border-gray-100 flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div className="flex items-center gap-4">
             {restaurant.logo_url ? (
               <img
                 src={restaurant.logo_url}
                 alt={restaurant.name}
-                width={48}
-                height={48}
-                className="w-12 h-12 rounded-lg object-cover"
+                className="w-20 h-20 rounded-2xl object-cover border-4 border-white shadow-md bg-white flex-shrink-0"
               />
             ) : (
-              <div className="w-12 h-12 rounded-lg bg-accent/5 flex items-center justify-center font-bold text-accent">
+              <div className="w-20 h-20 rounded-2xl bg-accent/10 border-4 border-white shadow-md flex items-center justify-center font-black text-2xl text-accent flex-shrink-0">
                 {restaurant.name.charAt(0)}
               </div>
             )}
             <div>
-              <h1 className="font-bold text-lg text-gray-800">
-                {restaurant.name}
-              </h1>
-              <p className="text-xs text-gray-500">
-                {restaurant.restaurant_type}
+              <div className="flex items-center gap-2">
+                <h1 className="font-extrabold text-2xl text-gray-900 leading-tight">
+                  {restaurant.name}
+                </h1>
+                <span className="bg-success/10 text-success text-xs font-bold px-2 py-0.5 rounded-full border border-success/20">
+                  Abierto
+                </span>
+              </div>
+              <p className="text-sm text-gray-500 mt-1 flex items-center gap-1.5">
+                <span className="font-semibold text-accent">{restaurant.restaurant_type}</span>
+                <span>•</span>
+                <span>Santiago, Chile</span>
               </p>
+              <p className="text-xs text-gray-400 mt-0.5">Pedidos por Mesa con QR instantáneo</p>
             </div>
           </div>
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-            <input
-              type="text"
-              placeholder="Buscar plato o bebida..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-accent/20"
-            />
+
+          <div className="flex flex-wrap gap-2 text-xs border-t border-gray-100 pt-3 md:border-t-0 md:pt-0">
+            <span className="px-3 py-1.5 bg-gray-50 rounded-lg text-gray-650 font-medium">⚡ Preparación Rápida</span>
+            <span className="px-3 py-1.5 bg-gray-50 rounded-lg text-gray-650 font-medium">💳 Pago Seguro POS</span>
           </div>
         </div>
       </div>
 
-      {/* Category Tabs */}
-      <div className="bg-white border-b sticky top-[108px] z-30">
-        <div className="max-w-screen-lg mx-auto px-4">
-          <div className="flex gap-2 overflow-x-auto py-2 scrollbar-hide">
+      {/* Sticky Header with Search and Categories */}
+      <div className="bg-white shadow-sm border-b sticky top-0 z-40">
+        <div className="max-w-screen-lg mx-auto px-4 py-3 space-y-3">
+          <div className="flex items-center justify-between gap-4">
+            <div className="flex items-center gap-2 flex-shrink-0">
+              <div className="w-8 h-8 rounded-lg bg-accent flex items-center justify-center font-bold text-white text-sm">
+                {restaurant.name.charAt(0)}
+              </div>
+              <span className="font-extrabold text-sm text-gray-800 hidden sm:inline">{restaurant.name}</span>
+            </div>
+            <div className="relative flex-1 max-w-md">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+              <input
+                type="text"
+                placeholder="Buscar plato o bebida..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="w-full pl-10 pr-4 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-accent/20"
+              />
+            </div>
+          </div>
+
+          {/* Category Tabs inside sticky bar */}
+          <div className="flex gap-2 overflow-x-auto py-1 scrollbar-hide border-t border-gray-100 pt-2">
             {categories.map((category) => (
               <button
                 key={category}
                 onClick={() => setCategoryFilter(category || "all")}
-                className={`px-4 py-1.5 rounded-full text-sm font-medium whitespace-nowrap ${
+                className={`px-4 py-1.5 rounded-full text-xs font-bold whitespace-nowrap transition-all ${
                   categoryFilter === category
-                    ? "bg-accent text-white"
-                    : "bg-gray-100 text-gray-600"
+                    ? "bg-accent text-white shadow-sm"
+                    : "bg-gray-100 text-gray-600 hover:bg-gray-200"
                 }`}
               >
                 {category === "all" ? "Todos" : category}
@@ -282,37 +336,56 @@ const CustomerMenu: React.FC = () => {
               return (
                 <div
                   key={item.id}
-                  className="bg-white rounded-xl overflow-hidden shadow-sm flex flex-col justify-between"
+                  className="bg-white rounded-xl overflow-hidden shadow-sm flex flex-col justify-between border border-gray-150 hover:shadow-md transition-shadow group duration-200"
                 >
-                  <div>
-                    <div className="relative h-36">
+                  <div className="cursor-pointer" onClick={() => handleItemClick(item)}>
+                    <div className="relative h-36 overflow-hidden">
                       {item.image_url ? (
                         <img
                           src={item.image_url}
                           alt={item.name}
                           loading="lazy"
-                          className="w-full h-full object-cover"
+                          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                         />
                       ) : (
-                        <div className="w-full h-full bg-gray-100 flex items-center justify-center">
+                        <div className="w-full h-full bg-gray-50 flex items-center justify-center group-hover:bg-gray-100 transition-colors">
                           <Package className="w-10 h-10 text-gray-300" />
                         </div>
                       )}
+                      {hasVariations && (
+                        <div className="absolute top-2 left-2">
+                          <span className="bg-black/60 backdrop-blur-xs text-white text-[10px] font-bold px-2 py-0.5 rounded-full">
+                            Personalizable
+                          </span>
+                        </div>
+                      )}
                       {!item.is_available && (
-                        <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
-                          <span className="bg-black/80 text-white text-xs px-2 py-1 rounded">
+                        <div className="absolute inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center">
+                          <span className="bg-red-500 text-white text-xs font-bold px-2.5 py-1 rounded-full shadow-sm">
                             Agotado
                           </span>
                         </div>
                       )}
                     </div>
 
-                    <div className="p-3">
-                      <h3 className="font-semibold text-sm text-gray-800 mb-1 line-clamp-2">
+                    <div className="p-3 space-y-1.5">
+                      <h3 className="font-bold text-sm text-gray-900 line-clamp-2 group-hover:text-accent transition-colors leading-tight">
                         {item.name}
                       </h3>
+                      
+                      {/* Dynamic food tags */}
+                      {getItemTags(item).length > 0 && (
+                        <div className="flex flex-wrap gap-1">
+                          {getItemTags(item).map((tag, idx) => (
+                            <span key={idx} className={`text-[10px] px-1.5 py-0.5 rounded font-bold border ${tag.colorClass}`}>
+                              {tag.label}
+                            </span>
+                          ))}
+                        </div>
+                      )}
+
                       {item.description && (
-                        <p className="text-xs text-gray-400 line-clamp-2 mt-0.5 leading-tight">
+                        <p className="text-xs text-gray-400 line-clamp-2 leading-snug">
                           {item.description}
                         </p>
                       )}
@@ -320,14 +393,16 @@ const CustomerMenu: React.FC = () => {
                   </div>
 
                   <div className="p-3 pt-0">
-                    <div className="flex items-end justify-between mt-2">
+                    <div className="flex items-center justify-between pt-2 border-t border-gray-50">
                       <div>
-                        <p className="font-bold text-gray-800">
+                        <span className="text-[10px] text-gray-400 block font-semibold leading-none mb-0.5">Precio</span>
+                        <p className="font-extrabold text-sm text-gray-900">
                           {item.sizes && item.sizes.length > 0
                             ? formatCurrency(
                                 Math.min(...item.sizes.map((s) => s.price))
                               )
                             : formatCurrency(item.base_price)}
+                          {item.sizes && item.sizes.length > 0 && <span className="text-[10px] text-gray-400 font-medium"> +</span>}
                         </p>
                       </div>
 
@@ -340,19 +415,19 @@ const CustomerMenu: React.FC = () => {
                                   ? handleItemClick(item)
                                   : handleAddSimple(item)
                               }
-                              className="px-4 py-1.5 border border-accent text-accent font-bold text-xs rounded-lg hover:bg-accent hover:text-white transition-colors"
+                              className="px-4 py-1.5 border border-accent text-accent font-extrabold text-xs rounded-lg hover:bg-accent hover:text-white active:scale-95 transition-all shadow-sm shadow-accent/5"
                             >
-                              AÑADIR
+                              AGREGAR
                             </button>
                           ) : (
-                            <div className="flex items-center bg-accent text-white rounded-lg">
+                            <div className="flex items-center bg-accent text-white rounded-lg shadow-sm">
                               <button
                                 onClick={() => handleRemoveItem(item.id)}
-                                className="px-2 py-1.5 hover:bg-accent-hover rounded-l-lg"
+                                className="px-2.5 py-1.5 hover:bg-accent-hover rounded-l-lg transition-colors"
                               >
                                 <Minus className="w-3.5 h-3.5" />
                               </button>
-                              <span className="px-2 font-bold text-xs">
+                              <span className="px-2 font-bold text-xs select-none">
                                 {quantity}
                               </span>
                               <button
@@ -361,7 +436,7 @@ const CustomerMenu: React.FC = () => {
                                     ? handleItemClick(item)
                                     : handleAddSimple(item)
                                 }
-                                className="px-2 py-1.5 hover:bg-accent-hover rounded-r-lg"
+                                className="px-2.5 py-1.5 hover:bg-accent-hover rounded-r-lg transition-colors"
                               >
                                 <Plus className="w-3.5 h-3.5" />
                               </button>
