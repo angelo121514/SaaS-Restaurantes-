@@ -13,12 +13,14 @@ import {
   Store as StoreIcon,
   BarChart3,
   ShieldCheck,
+  ShieldAlert,
 } from "lucide-react";
 import DashboardHome from "./DashboardHome";
 import PendingRequests from "./PendingRequests";
 import AllRestaurants from "./AllRestaurants";
 import Analytics from "./Analytics";
 import Privacy from "./Privacy";
+import Security from "./Security";
 import { CmorFlowLogo } from "../../components/CmorFlowLogo";
 import { supabase } from "../../config/authClient";
 import { useAuth } from "../../hooks/useAuth";
@@ -47,6 +49,7 @@ const AdminDashboard: React.FC = () => {
     { path: "/admin/restaurants", icon: StoreIcon, label: "Restaurantes Activos" },
     { path: "/admin/analytics", icon: BarChart3, label: "Métricas Globales" },
     { path: "/admin/privacy", icon: ShieldCheck, label: "Privacidad (DPO)" },
+    { path: "/admin/security", icon: ShieldAlert, label: "Seguridad" },
   ];
 
   return (
@@ -106,6 +109,7 @@ const AdminDashboard: React.FC = () => {
           <Route path="restaurants" element={<AllRestaurants />} />
           <Route path="analytics" element={<Analytics />} />
           <Route path="privacy" element={<Privacy />} />
+          <Route path="security" element={<Security />} />
         </Routes>
       </div>
 
