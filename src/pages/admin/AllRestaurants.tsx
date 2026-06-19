@@ -216,7 +216,7 @@ const AllRestaurants: React.FC = () => {
               const ownerName = groupRestaurants[0].owner_name || "Propietario";
 
               return (
-                <div key={email} className="bg-white rounded-xl border border-border p-5 shadow-sm space-y-4">
+                <div key={email} className="bg-bg rounded-xl border border-border p-5 shadow-sm space-y-4">
                   {/* Group Header */}
                   <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-border pb-3">
                     <div className="flex items-center gap-3">
