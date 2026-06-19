@@ -1,11 +1,12 @@
 import React, { useState } from "react";
-import { Link } from "react-router-dom";
-import { Mail, Send } from "lucide-react";
+import { Link, useNavigate } from "react-router-dom";
+import { Mail, Send, X } from "lucide-react";
 import { Button, Card, Input, Textarea, Alert } from "../../components/ui";
 import { contactDpo } from "../../services/privacyService";
 import { DPO_EMAIL } from "../../config/supabase";
 
 const ContactDpoPage: React.FC = () => {
+  const navigate = useNavigate();
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [message, setMessage] = useState("");
@@ -49,9 +50,25 @@ const ContactDpoPage: React.FC = () => {
           <Link to="/" className="font-bold text-text">
             CMOR FLOW
           </Link>
-          <Link to="/" className="text-sm text-text-secondary hover:text-accent">
-            Volver al inicio
-          </Link>
+          <div className="flex items-center gap-4">
+            <Link to="/" className="text-sm text-text-secondary hover:text-accent">
+              Volver al inicio
+            </Link>
+            <button
+              onClick={() => {
+                if (window.history.length > 1) {
+                  navigate(-1);
+                } else {
+                  navigate("/");
+                }
+              }}
+              className="p-1 rounded-full text-text-secondary hover:text-text hover:bg-bg/20 transition-all"
+              aria-label="Cerrar"
+              title="Cerrar y volver"
+            >
+              <X className="w-6 h-6" />
+            </button>
+          </div>
         </div>
       </nav>
 

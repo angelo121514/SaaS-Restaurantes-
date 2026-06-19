@@ -1,12 +1,13 @@
 import React, { useState } from "react";
-import { Link } from "react-router-dom";
-import { Shield, Mail, FileText } from "lucide-react";
+import { Link, useNavigate } from "react-router-dom";
+import { Shield, Mail, FileText, X } from "lucide-react";
 import { Button, Card, Badge } from "../../components/ui";
 import { PrivacyPolicyModal } from "../../components/privacy/PrivacyPolicyModal";
 import { CURRENT_POLICY_VERSION } from "../../config/supabase";
 
 const PrivacyPage: React.FC = () => {
   const [modalOpen, setModalOpen] = useState(false);
+  const navigate = useNavigate();
 
   return (
     <div className="min-h-screen bg-bg text-text">
@@ -15,9 +16,25 @@ const PrivacyPage: React.FC = () => {
           <Link to="/" className="font-bold text-text">
             CMOR FLOW
           </Link>
-          <Link to="/" className="text-sm text-text-secondary hover:text-accent">
-            Volver al inicio
-          </Link>
+          <div className="flex items-center gap-4">
+            <Link to="/" className="text-sm text-text-secondary hover:text-accent">
+              Volver al inicio
+            </Link>
+            <button
+              onClick={() => {
+                if (window.history.length > 1) {
+                  navigate(-1);
+                } else {
+                  navigate("/");
+                }
+              }}
+              className="p-1 rounded-full text-text-secondary hover:text-text hover:bg-bg/20 transition-all"
+              aria-label="Cerrar"
+              title="Cerrar y volver"
+            >
+              <X className="w-6 h-6" />
+            </button>
+          </div>
         </div>
       </nav>
 
