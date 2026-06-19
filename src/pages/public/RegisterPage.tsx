@@ -933,7 +933,15 @@ const RegisterPage: React.FC = () => {
 
             {/* Terms */}
             <div className="bg-bg border border-border rounded-xl p-4 text-xs text-text-secondary leading-relaxed transition-colors">
-              Al enviar este formulario, aceptas nuestros Términos de Servicio y nuestra Política de Privacidad. Nuestro equipo se pondrá en contacto contigo a la brevedad.
+              Al enviar este formulario, aceptas nuestros{" "}
+              <Link to="/legal/terminos" target="_blank" className="text-accent underline hover:text-accent-secondary">
+                Términos de Servicio
+              </Link>{" "}
+              y nuestra{" "}
+              <Link to="/legal/privacidad" target="_blank" className="text-accent underline hover:text-accent-secondary">
+                Política de Privacidad
+              </Link>
+              . Nuestro equipo se pondrá en contacto contigo a la brevedad.
             </div>
 
             {/* Submit Button */}

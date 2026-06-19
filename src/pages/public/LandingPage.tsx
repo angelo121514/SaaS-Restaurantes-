@@ -518,14 +518,14 @@ const LandingPage: React.FC = () => {
               <h4 className="font-bold text-text text-sm uppercase tracking-wider mb-4">Legal</h4>
               <ul className="space-y-2.5">
                 <li>
-                  <a href="#" className="text-sm text-text-secondary hover:text-red-500 transition-colors">
+                  <Link to="/legal/terminos" className="text-sm text-text-secondary hover:text-red-500 transition-colors">
                     Términos y Condiciones
-                  </a>
+                  </Link>
                 </li>
                 <li>
-                  <a href="#" className="text-sm text-text-secondary hover:text-red-500 transition-colors">
+                  <Link to="/legal/privacidad" className="text-sm text-text-secondary hover:text-red-500 transition-colors">
                     Política de Privacidad
-                  </a>
+                  </Link>
                 </li>
               </ul>
             </div>

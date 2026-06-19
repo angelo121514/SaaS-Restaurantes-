@@ -23,6 +23,7 @@ const NotFoundPage = lazy(() => import("./pages/NotFoundPage"));
 const PublicPrivacy = lazy(() => import("./pages/public/Privacy"));
 const PublicPrivacyClients = lazy(() => import("./pages/public/PrivacyClients"));
 const PublicContactDpo = lazy(() => import("./pages/public/ContactDpo"));
+const PublicTerms = lazy(() => import("./pages/public/Terms"));
 import { CookieBanner } from "./components/privacy/CookieBanner";
 
 // Lightweight fallback shown while a lazy route resolves its chunk.
@@ -50,6 +51,7 @@ function App() {
           <Route path="/legal/privacidad" element={<PublicPrivacy />} />
           <Route path="/legal/privacidad-clientes" element={<PublicPrivacyClients />} />
           <Route path="/legal/contacto-dpo" element={<PublicContactDpo />} />
+          <Route path="/legal/terminos" element={<PublicTerms />} />
 
           {/* Restaurant Dashboard Routes */}
           <Route
