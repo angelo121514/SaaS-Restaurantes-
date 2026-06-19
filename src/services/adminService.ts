@@ -261,6 +261,31 @@ export const toggleRestaurantStatus = async (
   return !error;
 };
 
+// Delete a restaurant (Admin function)
+export const deleteRestaurant = async (restaurantId: string): Promise<boolean> => {
+  if (isMockMode) {
+    const restaurantsStore = JSON.parse(localStorage.getItem("mock_db_restaurants") || "[]");
+    const profilesStore = JSON.parse(localStorage.getItem("mock_db_profiles") || "[]");
+    const usersStore = JSON.parse(localStorage.getItem("mock_db_users") || "[]");
+
+    const updatedRestaurants = restaurantsStore.filter((r: any) => r.id !== restaurantId);
+    const updatedProfiles = profilesStore.filter((p: any) => p.restaurant_id !== restaurantId);
+    const updatedUsers = usersStore.filter((u: any) => u.restaurant_id !== restaurantId);
+
+    localStorage.setItem("mock_db_restaurants", JSON.stringify(updatedRestaurants));
+    localStorage.setItem("mock_db_profiles", JSON.stringify(updatedProfiles));
+    localStorage.setItem("mock_db_users", JSON.stringify(updatedUsers));
+
+    return true;
+  }
+
+  const { data, error } = await supabase.rpc("admin_delete_restaurant", {
+    p_restaurant_id: restaurantId,
+  });
+
+  return !error && !!data;
+};
+
 // Get platform statistics
 export const getPlatformStats = async () => {
   try {

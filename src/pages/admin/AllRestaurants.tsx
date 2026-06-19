@@ -10,6 +10,7 @@ import {
   MapPin,
   Calendar,
   Crown,
+  Trash2,
 } from "lucide-react";
 import {
   Card,
@@ -24,6 +25,7 @@ import {
 import {
   subscribeToRestaurants,
   toggleRestaurantStatus,
+  deleteRestaurant,
 } from "../../services/adminService";
 import type { Restaurant } from "../../config/supabase";
 import { formatDateTime } from "../../utils/helpers";
@@ -47,6 +49,12 @@ const AllRestaurants: React.FC = () => {
     useState<Restaurant | null>(null);
   const [showDetailsModal, setShowDetailsModal] = useState(false);
   const [showBlockModal, setShowBlockModal] = useState(false);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+
+  const handleDeleteClick = (restaurant: Restaurant) => {
+    setSelectedRestaurant(restaurant);
+    setShowDeleteModal(true);
+  };
 
   // Real-time subscription
   useEffect(() => {
@@ -264,7 +272,7 @@ const AllRestaurants: React.FC = () => {
                             </div>
                           </div>
 
-                          <div className="flex gap-2 items-center md:min-w-[280px]">
+                          <div className="grid grid-cols-3 gap-2 w-full md:min-w-[380px] items-center">
                             <Button
                               variant="outline"
                               size="sm"
@@ -290,6 +298,16 @@ const AllRestaurants: React.FC = () => {
                               onClick={() => handleToggleBlock(restaurant)}
                             >
                               {restaurant.status === "blocked" ? "Desbloquear" : "Bloquear"}
+                            </Button>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              fullWidth
+                              className="border-danger/30 hover:bg-danger/10 hover:border-danger text-danger font-semibold"
+                              icon={<Trash2 className="w-4 h-4 text-danger" />}
+                              onClick={() => handleDeleteClick(restaurant)}
+                            >
+                              Eliminar
                             </Button>
                           </div>
                         </div>
@@ -319,6 +337,16 @@ const AllRestaurants: React.FC = () => {
         restaurant={selectedRestaurant}
         onClose={() => {
           setShowBlockModal(false);
+          setSelectedRestaurant(null);
+        }}
+      />
+
+      {/* Delete Confirmation Modal */}
+      <DeleteModal
+        isOpen={showDeleteModal}
+        restaurant={selectedRestaurant}
+        onClose={() => {
+          setShowDeleteModal(false);
           setSelectedRestaurant(null);
         }}
       />
@@ -561,6 +589,108 @@ const BlockModal: React.FC<BlockModalProps> = ({
             fullWidth
           >
             {isBlocked ? "Desbloquear" : "Bloquear"}
+          </Button>
+        </div>
+      </div>
+    </Modal>
+  );
+};
+
+// Delete Modal Component
+interface DeleteModalProps {
+  isOpen: boolean;
+  restaurant: Restaurant | null;
+  onClose: () => void;
+}
+
+const DeleteModal: React.FC<DeleteModalProps> = ({
+  isOpen,
+  restaurant,
+  onClose,
+}) => {
+  const [loading, setLoading] = useState(false);
+  const [confirmName, setConfirmName] = useState("");
+  const [error, setError] = useState("");
+
+  const handleDelete = async () => {
+    if (!restaurant) return;
+    
+    if (confirmName.trim().toLowerCase() !== restaurant.name.trim().toLowerCase()) {
+      setError("El nombre del restaurante no coincide");
+      return;
+    }
+
+    setLoading(true);
+    setError("");
+
+    try {
+      const success = await deleteRestaurant(restaurant.id);
+      if (success) {
+        onClose();
+        setConfirmName("");
+      } else {
+        setError("No se pudo eliminar el restaurante de la base de datos.");
+      }
+    } catch (err: any) {
+      setError(err?.message || "Ocurrió un error inesperado al eliminar.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (!restaurant) return null;
+
+  return (
+    <Modal
+      isOpen={isOpen}
+      onClose={onClose}
+      title="Eliminar Restaurante"
+      size="md"
+    >
+      <div className="space-y-4">
+        {error && (
+          <div className="bg-danger/10 border border-danger/20 rounded-lg p-3 text-sm text-danger font-medium">
+            {error}
+          </div>
+        )}
+
+        <div className="bg-danger/5 border border-danger/10 rounded-xl p-4 text-sm text-danger space-y-2">
+          <p className="font-extrabold flex items-center gap-1.5">
+            ⚠️ ¡ATENCIÓN! ACCIÓN IRREVERSIBLE
+          </p>
+          <p className="leading-relaxed text-xs">
+            Esta acción eliminará de forma permanente al restaurante <strong>{restaurant.name}</strong>, incluyendo su catálogo de menús, códigos QR, historial de pedidos, perfiles de personal e información vinculada en cascada.
+          </p>
+        </div>
+
+        <div className="space-y-2">
+          <label className="block text-xs text-text-secondary font-semibold">
+            Para confirmar, escribe el nombre del restaurante: <strong className="text-text font-bold select-all">{restaurant.name}</strong>
+          </label>
+          <Input
+            value={confirmName}
+            onChange={(e) => {
+              setConfirmName(e.target.value);
+              setError("");
+            }}
+            placeholder="Escribe el nombre aquí..."
+            required
+          />
+        </div>
+
+        <div className="flex gap-3 pt-2">
+          <Button type="button" variant="outline" onClick={onClose} fullWidth>
+            Cancelar
+          </Button>
+          <Button
+            variant="danger"
+            onClick={handleDelete}
+            disabled={confirmName.trim().toLowerCase() !== restaurant.name.trim().toLowerCase()}
+            loading={loading}
+            fullWidth
+            className="bg-danger hover:bg-danger/90 text-white font-bold transition-all border-0 shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            Eliminar Permanentemente
           </Button>
         </div>
       </div>
