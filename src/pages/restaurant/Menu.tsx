@@ -19,10 +19,11 @@ import {
 } from "../../services/restaurantService";
 import type { MenuItem } from "../../config/supabase";
 import { formatCurrency, getStoredUser } from "../../utils/helpers";
-import { useRestaurantId } from "../../hooks/useAuth";
+import { useAuth, useRestaurantId } from "../../hooks/useAuth";
 import { ImageDropZone } from "../../components/ImageDropZone";
 
 const Menu: React.FC = () => {
+  const { restaurant } = useAuth();
   const restaurantId = useRestaurantId();
   const [menuItems, setMenuItems] = useState<MenuItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -80,6 +81,27 @@ const Menu: React.FC = () => {
 
   return (
     <div className="space-y-6">
+      {/* Banner de Límite de Prueba */}
+      {restaurant?.subscription_plan === "free_trial" && (
+        <div className={`p-4 rounded-xl border flex items-center justify-between text-sm ${
+          menuItems.length >= 30 
+            ? "bg-red-500/10 border-red-500/30 text-red-500 font-medium" 
+            : "bg-amber-500/10 border-amber-500/30 text-amber-600 font-medium"
+        }`}>
+          <div className="flex items-center gap-2">
+            <Package className="w-5 h-5" />
+            <span>
+              {menuItems.length >= 30 
+                ? "⚠️ Has alcanzado el límite de 30 platos del plan de prueba. Por favor, actualiza tu plan en Configuración para agregar más platos."
+                : `Límite de platos en Plan de Prueba: ${menuItems.length} / 30 platos creados.`}
+            </span>
+          </div>
+          {menuItems.length < 30 && (
+            <span className="font-bold">{(30 - menuItems.length)} disponibles</span>
+          )}
+        </div>
+      )}
+
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
@@ -91,6 +113,7 @@ const Menu: React.FC = () => {
         <Button
           icon={<Plus className="w-5 h-5" />}
           onClick={() => setShowAddModal(true)}
+          disabled={restaurant?.subscription_plan === "free_trial" && menuItems.length >= 30}
         >
           Agregar Plato
         </Button>
@@ -254,6 +277,7 @@ const Menu: React.FC = () => {
         isOpen={showAddModal}
         onClose={() => setShowAddModal(false)}
         mode="add"
+        menuItemsCount={menuItems.length}
       />
 
       <MenuItemModal
@@ -264,6 +288,7 @@ const Menu: React.FC = () => {
           setSelectedItem(null);
         }}
         mode="edit"
+        menuItemsCount={menuItems.length}
       />
 
       {/* Delete Modal */}
@@ -285,6 +310,7 @@ interface MenuItemModalProps {
   item?: MenuItem | null;
   onClose: () => void;
   mode: "add" | "edit";
+  menuItemsCount?: number;
 }
 
 const MenuItemModal: React.FC<MenuItemModalProps> = ({
@@ -292,7 +318,9 @@ const MenuItemModal: React.FC<MenuItemModalProps> = ({
   item,
   onClose,
   mode,
+  menuItemsCount = 0,
 }) => {
+  const { restaurant } = useAuth();
   const restaurantId = useRestaurantId();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -302,6 +330,7 @@ const MenuItemModal: React.FC<MenuItemModalProps> = ({
     category: "",
     base_price: "",
     image_url: "",
+    image_urls: ["", "", ""],
     is_available: true,
     sizes: [] as { name: string; price: number }[],
     addons: [] as { name: string; price: number }[],
@@ -318,6 +347,9 @@ const MenuItemModal: React.FC<MenuItemModalProps> = ({
         category: item.category || "",
         base_price: item.base_price.toString(),
         image_url: item.image_url || "",
+        image_urls: item.image_urls && item.image_urls.length > 0 
+          ? [...item.image_urls, "", "", ""].slice(0, 3) 
+          : [item.image_url || "", "", ""],
         is_available: item.is_available,
         sizes: item.sizes || [],
         addons: item.addons || [],
@@ -329,6 +361,7 @@ const MenuItemModal: React.FC<MenuItemModalProps> = ({
         category: "",
         base_price: "",
         image_url: "",
+        image_urls: ["", "", ""],
         is_available: true,
         sizes: [],
         addons: [],
@@ -350,15 +383,23 @@ const MenuItemModal: React.FC<MenuItemModalProps> = ({
       return;
     }
 
+    // Validación del límite estricto de ciberseguridad/reglas de negocio de 30 platos del plan de prueba
+    if (mode === "add" && restaurant?.subscription_plan === "free_trial" && menuItemsCount >= 30) {
+      setError("Tu plan de prueba tiene una restricción de un máximo de 30 platos. Por favor, actualiza tu plan en Configuración para agregar más platos.");
+      return;
+    }
+
     setLoading(true);
 
+    const activeImages = formData.image_urls.filter(Boolean);
     const menuItemData = {
       restaurant_id: restaurantId,
       name: formData.name,
       description: formData.description || undefined,
       category: formData.category || undefined,
       base_price: parseFloat(formData.base_price),
-      image_url: formData.image_url || undefined,
+      image_url: activeImages[0] || undefined, // Retrocompatibilidad
+      image_urls: activeImages,
       is_available: formData.is_available,
       sizes: formData.sizes.length > 0 ? formData.sizes : undefined,
       addons: formData.addons.length > 0 ? formData.addons : undefined,
@@ -470,13 +511,38 @@ const MenuItemModal: React.FC<MenuItemModalProps> = ({
           />
         </div>
 
-        <ImageDropZone
-          value={formData.image_url}
-          onChange={(base64) =>
-            setFormData({ ...formData, image_url: base64 })
-          }
-          label="Foto del Plato (Arrastra o sube una imagen)"
-        />
+        <div className="space-y-2">
+          <label className="label">Fotos del Plato (Hasta 3 imágenes, Máx. 2MB c/u)</label>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+            <ImageDropZone
+              value={formData.image_urls[0]}
+              onChange={(base64) => {
+                const newUrls = [...formData.image_urls];
+                newUrls[0] = base64;
+                setFormData({ ...formData, image_urls: newUrls });
+              }}
+              label="Foto 1 (Principal)"
+            />
+            <ImageDropZone
+              value={formData.image_urls[1]}
+              onChange={(base64) => {
+                const newUrls = [...formData.image_urls];
+                newUrls[1] = base64;
+                setFormData({ ...formData, image_urls: newUrls });
+              }}
+              label="Foto 2 (Opcional)"
+            />
+            <ImageDropZone
+              value={formData.image_urls[2]}
+              onChange={(base64) => {
+                const newUrls = [...formData.image_urls];
+                newUrls[2] = base64;
+                setFormData({ ...formData, image_urls: newUrls });
+              }}
+              label="Foto 3 (Opcional)"
+            />
+          </div>
+        </div>
 
         {/* Sizes */}
         <div>

@@ -1,13 +1,20 @@
 import React, { useState, useEffect } from "react";
-import { Download, QrCode as QrCodeIcon, ExternalLink, LifeBuoy, Copy, Check, Lock } from "lucide-react";
+import { Download, QrCode as QrCodeIcon, ExternalLink, LifeBuoy, Copy, Check, Lock, CreditCard, Globe, Coins, Hourglass, HelpCircle } from "lucide-react";
 import { Card, Button, Loading, Alert, Input } from "../../components/ui";
 import { QRCodeSVG } from "qrcode.react";
 import { supabase } from "../../config/supabase";
 import type { Restaurant } from "../../config/supabase";
 import { useAuth, useRestaurantId } from "../../hooks/useAuth";
 
+const getTrialDaysLeft = (endsAt: string | null | undefined): number => {
+  if (!endsAt) return 0;
+  const diff = new Date(endsAt).getTime() - Date.now();
+  if (diff <= 0) return 0;
+  return Math.ceil(diff / (1000 * 60 * 60 * 24));
+};
+
 const RestaurantSettings: React.FC = () => {
-  const { profile } = useAuth();
+  const { profile, refresh } = useAuth();
   const restaurantId = useRestaurantId();
   const [restaurant, setRestaurant] = useState<Restaurant | null>(null);
   const [loading, setLoading] = useState(true);
@@ -21,6 +28,27 @@ const RestaurantSettings: React.FC = () => {
   });
   const [passwordStatus, setPasswordStatus] = useState<{ type: "success" | "error"; message: string } | null>(null);
   const [passwordLoading, setPasswordLoading] = useState(false);
+
+  // Local settings state
+  const [configData, setConfigData] = useState({
+    currency: "CLP",
+    usdExchangeRate: 950,
+    defaultLanguage: "es",
+    defaultPrepTime: 15,
+  });
+  const [configLoading, setConfigLoading] = useState(false);
+  const [configStatus, setConfigStatus] = useState<{ type: "success" | "error"; message: string } | null>(null);
+
+  // Billing state
+  const [selectedPlan, setSelectedPlan] = useState<string | null>(null);
+  const [paymentData, setPaymentData] = useState({
+    cardNumber: "",
+    cardName: "",
+    cardExpiry: "",
+    cardCvc: "",
+  });
+  const [billingLoading, setBillingLoading] = useState(false);
+  const [billingStatus, setBillingStatus] = useState<{ type: "success" | "error"; message: string } | null>(null);
 
   const handleCopyId = async () => {
     if (!restaurant) return;
@@ -107,6 +135,107 @@ const RestaurantSettings: React.FC = () => {
 
     fetchRestaurant();
   }, [restaurantId, profile]);
+
+  useEffect(() => {
+    if (restaurant) {
+      setConfigData({
+        currency: restaurant.currency || "CLP",
+        usdExchangeRate: restaurant.usd_exchange_rate || 950,
+        defaultLanguage: restaurant.default_language || "es",
+        defaultPrepTime: restaurant.default_prep_time || 15,
+      });
+    }
+  }, [restaurant]);
+
+  const handleSaveConfig = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setConfigStatus(null);
+    setConfigLoading(true);
+
+    try {
+      const { error: updateError } = await supabase
+        .from("restaurants")
+        .update({
+          currency: configData.currency,
+          usd_exchange_rate: Number(configData.usdExchangeRate),
+          default_language: configData.defaultLanguage,
+          default_prep_time: Number(configData.defaultPrepTime),
+        })
+        .eq("id", restaurantId);
+
+      if (updateError) {
+        setConfigStatus({
+          type: "error",
+          message: updateError.message || "Error al guardar la configuración.",
+        });
+      } else {
+        setConfigStatus({
+          type: "success",
+          message: "¡Configuración de local guardada exitosamente!",
+        });
+        if (refresh) await refresh();
+      }
+    } catch (err: any) {
+      setConfigStatus({
+        type: "error",
+        message: err.message || "Ocurrió un error inesperado al guardar.",
+      });
+    } finally {
+      setConfigLoading(false);
+    }
+  };
+
+  const handleUpgradePlan = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedPlan) return;
+    setBillingStatus(null);
+    setBillingLoading(true);
+
+    try {
+      const { error: updateError } = await supabase
+        .from("restaurants")
+        .update({
+          subscription_plan: selectedPlan,
+          status: "active",
+          trial_ends_at: null,
+        })
+        .eq("id", restaurantId);
+
+      if (updateError) {
+        setBillingStatus({
+          type: "error",
+          message: updateError.message || "Error al activar la suscripción.",
+        });
+      } else {
+        setBillingStatus({
+          type: "success",
+          message: `¡Pago simulado procesado exitosamente! Tu local ahora cuenta con una suscripción activa al plan ${selectedPlan.toUpperCase()}.`,
+        });
+        setSelectedPlan(null);
+        setPaymentData({
+          cardNumber: "",
+          cardName: "",
+          cardExpiry: "",
+          cardCvc: "",
+        });
+        if (refresh) await refresh();
+        // Recargar localmente
+        const { data: updatedRest } = await supabase
+          .from("restaurants")
+          .select("*")
+          .eq("id", restaurantId)
+          .single();
+        if (updatedRest) setRestaurant(updatedRest);
+      }
+    } catch (err: any) {
+      setBillingStatus({
+        type: "error",
+        message: err.message || "Ocurrió un error inesperado al procesar el pago.",
+      });
+    } finally {
+      setBillingLoading(false);
+    }
+  };
 
   const downloadQRCode = () => {
     if (!restaurant) return;
@@ -350,19 +479,301 @@ const RestaurantSettings: React.FC = () => {
         </div>
       </Card>
 
-      {/* Additional Settings Placeholder */}
-      <Card className="bg-bg-subtle">
-        <h3 className="text-lg font-bold text-text mb-3">
-          Configuración Adicional (Próximamente)
-        </h3>
-        <ul className="space-y-2 text-text-secondary text-sm">
-          <li>• Editar perfil comercial y horarios de atención</li>
-          <li>• Subir logotipo de la tienda y portada personalizada</li>
-          <li>• Cambiar colores de marca en la carta de clientes</li>
-          <li>• Ajustar porcentaje de propina sugerida e impuestos locales</li>
-          <li>• Habilitar/deshabilitar pagos en línea integrados</li>
-        </ul>
-      </Card>
+      {/* Configuración de Local */}
+      {profile?.role !== "admin" && restaurant && (
+        <Card>
+          <div className="flex items-start space-x-3 mb-4">
+            <Globe className="w-6 h-6 text-accent" />
+            <div>
+              <h3 className="text-xl font-bold text-text">Configuración del Local</h3>
+              <p className="text-text-secondary text-sm">
+                Ajusta las preferencias de moneda, idioma de la carta y tiempos límites de cocina.
+              </p>
+            </div>
+          </div>
+
+          {configStatus && (
+            <Alert
+              type={configStatus.type}
+              message={configStatus.message}
+              className={
+                configStatus.type === "success"
+                  ? "bg-emerald-950/40 border-emerald-800/50 text-emerald-200 mb-4"
+                  : "bg-red-950/40 border-red-800/50 text-red-200 mb-4"
+              }
+            />
+          )}
+
+          <form onSubmit={handleSaveConfig} className="space-y-4">
+            <div className="grid md:grid-cols-2 gap-4">
+              <div>
+                <label className="label mb-2">Moneda Principal</label>
+                <select
+                  value={configData.currency}
+                  onChange={(e) => setConfigData({ ...configData, currency: e.target.value as any })}
+                  className="input w-full bg-bg border border-border text-text rounded-lg p-2.5"
+                >
+                  <option value="CLP">Pesos Chilenos (CLP)</option>
+                  <option value="USD">Dólares Americanos (USD)</option>
+                </select>
+              </div>
+
+              <div>
+                <Input
+                  label="Tipo de Cambio (1 USD a CLP)"
+                  type="number"
+                  placeholder="950"
+                  value={configData.usdExchangeRate}
+                  onChange={(e) => setConfigData({ ...configData, usdExchangeRate: parseFloat(e.target.value) || 0 })}
+                  required
+                  disabled={configData.currency !== "USD"}
+                />
+              </div>
+
+              <div>
+                <label className="label mb-2">Idioma Predeterminado de la Carta</label>
+                <select
+                  value={configData.defaultLanguage}
+                  onChange={(e) => setConfigData({ ...configData, defaultLanguage: e.target.value as any })}
+                  className="input w-full bg-bg border border-border text-text rounded-lg p-2.5"
+                >
+                  <option value="es">Español (ES)</option>
+                  <option value="en">Inglés (EN)</option>
+                </select>
+              </div>
+
+              <div>
+                <Input
+                  label="Tiempo Límite de Cocina por Defecto (Minutos)"
+                  type="number"
+                  placeholder="15"
+                  value={configData.defaultPrepTime}
+                  onChange={(e) => setConfigData({ ...configData, defaultPrepTime: parseInt(e.target.value) || 0 })}
+                  required
+                  min={1}
+                />
+              </div>
+            </div>
+
+            <Button
+              type="submit"
+              loading={configLoading}
+              className="bg-accent hover:bg-accent/90 text-white font-bold px-6 border-0 shadow-md transition-all active:scale-[0.98]"
+            >
+              Guardar Configuración
+            </Button>
+          </form>
+        </Card>
+      )}
+
+      {/* Suscripción y Facturación */}
+      {profile?.role !== "admin" && restaurant && (
+        <Card>
+          <div className="flex items-start space-x-3 mb-4">
+            <CreditCard className="w-6 h-6 text-accent" />
+            <div>
+              <h3 className="text-xl font-bold text-text">Suscripción y Facturación</h3>
+              <p className="text-text-secondary text-sm">
+                Gestiona tu plan actual, revisa el estado de tu período de prueba y sube de plan.
+              </p>
+            </div>
+          </div>
+
+          {billingStatus && (
+            <Alert
+              type={billingStatus.type}
+              message={billingStatus.message}
+              className={
+                billingStatus.type === "success"
+                  ? "bg-emerald-950/40 border-emerald-800/50 text-emerald-200 mb-4"
+                  : "bg-red-950/40 border-red-800/50 text-red-200 mb-4"
+              }
+            />
+          )}
+
+          {/* Estado del plan actual */}
+          <div className="p-4 rounded-xl border border-border bg-bg-subtle mb-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="text-sm text-text-secondary font-medium">Plan actual:</span>
+                <span className={`text-xs font-bold px-2 py-0.5 rounded-full border uppercase ${
+                  restaurant.subscription_plan === "free_trial"
+                    ? "bg-amber-500/10 text-amber-600 border-amber-500/20"
+                    : "bg-success/10 text-success border-success/20"
+                }`}>
+                  {restaurant.subscription_plan === "free_trial" ? "Prueba Gratuita" : restaurant.subscription_plan}
+                </span>
+              </div>
+              {restaurant.subscription_plan === "free_trial" && (
+                <div className="flex items-center gap-1 text-sm text-text-secondary mt-1">
+                  <Hourglass className="w-4 h-4 text-amber-500" />
+                  <span>
+                    Te quedan{" "}
+                    <strong className="text-text font-bold">
+                      {getTrialDaysLeft(restaurant.trial_ends_at)} días
+                    </strong>{" "}
+                    de prueba.
+                  </span>
+                </div>
+              )}
+            </div>
+            
+            {restaurant.subscription_plan === "free_trial" && getTrialDaysLeft(restaurant.trial_ends_at) === 0 && (
+              <div className="bg-error/10 border border-error/20 rounded-lg p-3 text-error text-xs max-w-md">
+                ⚠️ **Prueba Expirada:** Tu período de prueba ha terminado. El POS de ventas y el Menú digital se encuentran bloqueados para pedidos de clientes. Contrata un plan a continuación.
+              </div>
+            )}
+          </div>
+
+          {/* Selector de Planes de Pago */}
+          <div className="space-y-4">
+            <h4 className="font-semibold text-text text-md">Planes de Suscripción Disponibles:</h4>
+            <div className="grid md:grid-cols-3 gap-4">
+              {[
+                {
+                  key: "starter",
+                  name: "Básico (Starter)",
+                  priceCLP: "$19.990 / mes",
+                  priceUSD: "$25.00 / mes",
+                  features: ["Pedidos ilimitados", "Menú básico", "POS + Código QR", "Soporte por correo"],
+                },
+                {
+                  key: "pro",
+                  name: "Pro",
+                  priceCLP: "$39.990 / mes",
+                  priceUSD: "$49.00 / mes",
+                  features: ["Todo del Starter", "CRM de Clientes", "Recomendaciones con IA", "Soporte Premium 24/7"],
+                },
+                {
+                  key: "enterprise",
+                  name: "Enterprise",
+                  priceCLP: "$79.990 / mes",
+                  priceUSD: "$99.00 / mes",
+                  features: ["Todo del Pro", "Multi-sucursal", "Facturación integrada", "SLA garantizado"],
+                },
+              ].map((p) => {
+                const isSelected = selectedPlan === p.key;
+                const isCurrent = restaurant.subscription_plan === p.key;
+                return (
+                  <div
+                    key={p.key}
+                    onClick={() => !isCurrent && setSelectedPlan(p.key)}
+                    className={`border-2 rounded-xl p-4 flex flex-col justify-between cursor-pointer transition-all duration-200 ${
+                      isCurrent
+                        ? "border-success bg-success/5 cursor-default"
+                        : isSelected
+                        ? "border-accent bg-accent/5 shadow-md shadow-accent/5"
+                        : "border-border hover:border-accent/40"
+                    }`}
+                  >
+                    <div>
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="font-bold text-text">{p.name}</span>
+                        {isCurrent && (
+                          <span className="text-[10px] bg-success text-white px-2 py-0.5 rounded-full font-bold">
+                            Activo
+                          </span>
+                        )}
+                      </div>
+                      <div className="text-xl font-extrabold text-accent mb-3">
+                        {configData.currency === "USD" ? p.priceUSD : p.priceCLP}
+                      </div>
+                      <ul className="space-y-1.5 text-xs text-text-secondary">
+                        {p.features.map((f, i) => (
+                          <li key={i} className="flex items-center gap-1">
+                            ✓ {f}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* Formulario de Pago Simulado si hay un plan seleccionado */}
+            {selectedPlan && (
+              <div className="bg-bg-subtle p-6 rounded-xl border border-border mt-6 space-y-4 max-w-md animate-fadeIn">
+                <div className="flex items-center gap-2 mb-2 border-b border-border pb-3">
+                  <CreditCard className="w-5 h-5 text-accent" />
+                  <h5 className="font-bold text-text">Pagar con Tarjeta de Crédito/Débito</h5>
+                </div>
+                <form onSubmit={handleUpgradePlan} className="space-y-3">
+                  <Input
+                    label="Nombre del Titular"
+                    placeholder="Juan Pérez"
+                    value={paymentData.cardName}
+                    onChange={(e) => setPaymentData({ ...paymentData, cardName: e.target.value })}
+                    required
+                  />
+                  <Input
+                    label="Número de la Tarjeta"
+                    placeholder="4111 2222 3333 4444"
+                    value={paymentData.cardNumber}
+                    onChange={(e) => {
+                      // Formatear espaciado de tarjeta
+                      const val = e.target.value.replace(/\s+/g, "").replace(/[^0-9]/gi, "");
+                      const matches = val.match(/\d{4,16}/g);
+                      const match = (matches && matches[0]) || "";
+                      const parts = [];
+                      for (let i = 0, len = match.length; i < len; i += 4) {
+                        parts.push(match.substring(i, i + 4));
+                      }
+                      setPaymentData({ ...paymentData, cardNumber: parts.length > 0 ? parts.join(" ") : val });
+                    }}
+                    required
+                    maxLength={19}
+                  />
+                  <div className="grid grid-cols-2 gap-3">
+                    <Input
+                      label="Expiración"
+                      placeholder="MM/AA"
+                      value={paymentData.cardExpiry}
+                      onChange={(e) => {
+                        let val = e.target.value.replace(/\//g, "").replace(/[^0-9]/gi, "");
+                        if (val.length >= 2) {
+                          val = val.substring(0, 2) + "/" + val.substring(2, 4);
+                        }
+                        setPaymentData({ ...paymentData, cardExpiry: val });
+                      }}
+                      required
+                      maxLength={5}
+                    />
+                    <Input
+                      label="CVC"
+                      placeholder="123"
+                      type="password"
+                      value={paymentData.cardCvc}
+                      onChange={(e) => setPaymentData({ ...paymentData, cardCvc: e.target.value.replace(/[^0-9]/gi, "") })}
+                      required
+                      maxLength={4}
+                    />
+                  </div>
+                  <div className="pt-2 flex gap-3">
+                    <Button
+                      type="submit"
+                      loading={billingLoading}
+                      className="bg-success hover:bg-success-dark text-white font-bold border-0 shadow-lg active:scale-[0.98]"
+                    >
+                      Pagar y Activar Suscripción
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => {
+                        setSelectedPlan(null);
+                        setPaymentData({ cardNumber: "", cardName: "", cardExpiry: "", cardCvc: "" });
+                      }}
+                    >
+                      Cancelar
+                    </Button>
+                  </div>
+                </form>
+              </div>
+            )}
+          </div>
+        </Card>
+      )}
     </div>
   );
 };

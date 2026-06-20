@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { ArrowLeft, Mail, Lock, AlertCircle, Sparkles } from "lucide-react";
-import { Button, Input, Alert } from "../../components/ui";
+import { Button, Input, Alert, Modal } from "../../components/ui";
 import { supabase } from "../../config/authClient";
 import { isValidEmail } from "../../utils/helpers";
 import { CmorFlowLogo } from "../../components/CmorFlowLogo";
@@ -14,6 +14,53 @@ const LoginPage: React.FC = () => {
     email: "",
     password: "",
   });
+
+  const [showForgotPasswordModal, setShowForgotPasswordModal] = useState(false);
+  const [forgotPasswordEmail, setForgotPasswordEmail] = useState("");
+  const [forgotPasswordLoading, setForgotPasswordLoading] = useState(false);
+  const [forgotPasswordError, setForgotPasswordError] = useState("");
+  const [forgotPasswordSuccess, setForgotPasswordSuccess] = useState(false);
+
+  const handleForgotPasswordSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setForgotPasswordError("");
+    
+    if (!forgotPasswordEmail) {
+      setForgotPasswordError("Por favor ingresa tu correo electrónico.");
+      return;
+    }
+    
+    if (!isValidEmail(forgotPasswordEmail)) {
+      setForgotPasswordError("Por favor ingresa una dirección de correo válida.");
+      return;
+    }
+    
+    setForgotPasswordLoading(true);
+    try {
+      const { error: resetError } = await supabase.auth.resetPasswordForEmail(forgotPasswordEmail, {
+        redirectTo: window.location.origin + "/setup-password",
+      });
+      
+      if (resetError) {
+        setForgotPasswordError(resetError.message || "Error al enviar el enlace de recuperación.");
+      } else {
+        setForgotPasswordSuccess(true);
+        const isMock = typeof (supabase as any).auth?.onAuthStateChange !== "function";
+        if (isMock) {
+          setTimeout(() => {
+            setShowForgotPasswordModal(false);
+            setForgotPasswordSuccess(false);
+            setForgotPasswordEmail("");
+            navigate("/setup-password");
+          }, 2000);
+        }
+      }
+    } catch (err: any) {
+      setForgotPasswordError(err?.message || "Error inesperado al enviar el enlace.");
+    } finally {
+      setForgotPasswordLoading(false);
+    }
+  };
 
   useEffect(() => {
     // Verificar si hay errores reportados en la URL (ej: redirigido desde RequireRole)
@@ -369,9 +416,18 @@ const LoginPage: React.FC = () => {
                   />
                   Recordarme
                 </label>
-                <a href="#" className="text-red-500 hover:text-red-600 transition-colors font-medium hover:underline">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setForgotPasswordEmail(formData.email);
+                    setForgotPasswordError("");
+                    setForgotPasswordSuccess(false);
+                    setShowForgotPasswordModal(true);
+                  }}
+                  className="text-red-500 hover:text-red-600 transition-colors font-medium hover:underline focus:outline-none"
+                >
                   ¿Olvidaste tu contraseña?
-                </a>
+                </button>
               </div>
 
               <Button 
@@ -445,6 +501,74 @@ const LoginPage: React.FC = () => {
           </p>
         </div>
       </div>
+      {/* Forgot Password Modal */}
+      <Modal
+        isOpen={showForgotPasswordModal}
+        onClose={() => setShowForgotPasswordModal(false)}
+        title="Restablecer Contraseña"
+        size="md"
+      >
+        {forgotPasswordSuccess ? (
+          <div className="text-center py-6 space-y-4">
+            <div className="w-12 h-12 bg-green-100 text-green-600 rounded-full flex items-center justify-center mx-auto">
+              <Sparkles className="w-6 h-6 animate-pulse" />
+            </div>
+            <h3 className="text-lg font-bold text-text">¡Enlace Enviado!</h3>
+            <p className="text-sm text-text-secondary text-center">
+              Se ha enviado un enlace de recuperación a tu dirección de correo electrónico si está registrada.
+            </p>
+            {typeof (supabase as any).auth?.onAuthStateChange !== "function" && (
+              <p className="text-xs text-amber-600 font-semibold text-center">
+                Modo Mock activo. Redirigiendo automáticamente a la pantalla de establecimiento de contraseña...
+              </p>
+            )}
+            <Button
+              onClick={() => {
+                setShowForgotPasswordModal(false);
+                setForgotPasswordSuccess(false);
+                setForgotPasswordEmail("");
+                navigate("/setup-password");
+              }}
+              fullWidth
+            >
+              Entendido
+            </Button>
+          </div>
+        ) : (
+          <form onSubmit={handleForgotPasswordSubmit} className="space-y-4">
+            <p className="text-sm text-text-secondary">
+              Ingresa el correo electrónico asociado a tu cuenta. Te enviaremos un enlace seguro para restablecer tu contraseña.
+            </p>
+            {forgotPasswordError && <Alert type="error" message={forgotPasswordError} />}
+            <Input
+              label="Correo Electrónico"
+              type="email"
+              value={forgotPasswordEmail}
+              onChange={(e) => setForgotPasswordEmail(e.target.value)}
+              placeholder="tu@correo.com"
+              icon={<Mail className="w-5 h-5 text-text-secondary" />}
+              required
+            />
+            <div className="flex space-x-3 pt-2">
+              <Button
+                type="button"
+                variant="ghost"
+                onClick={() => setShowForgotPasswordModal(false)}
+                fullWidth
+              >
+                Cancelar
+              </Button>
+              <Button
+                type="submit"
+                loading={forgotPasswordLoading}
+                fullWidth
+              >
+                Enviar Enlace
+              </Button>
+            </div>
+          </form>
+        )}
+      </Modal>
     </div>
   );
 };

@@ -22,7 +22,7 @@ import {
   createOrder,
 } from "../../services/restaurantService";
 import type { MenuItem } from "../../config/supabase";
-import { formatCurrency } from "../../utils/helpers";
+import { formatCurrency as baseFormatCurrency } from "../../utils/helpers";
 import { supabase } from "../../config/supabase";
 import { APP_CONFIG } from "../../config/config";
 import { CmorFlowLogo } from "../../components/CmorFlowLogo";
@@ -35,26 +35,207 @@ interface CartItem extends MenuItem {
   itemTotal: number;
 }
 
-const getItemTags = (item: MenuItem) => {
+
+const TRANSLATIONS = {
+  es: {
+    loading: "Cargando la carta digital...",
+    notFound: "Restaurante no encontrado",
+    notFoundDesc: "El restaurante al que intentas acceder no existe o no se encuentra activo.",
+    open: "Abierto",
+    qrOrders: "Pedidos por Mesa con QR instantáneo",
+    fastPrep: "⚡ Preparación Rápida",
+    securePayment: "💳 Pago Seguro POS",
+    searchPlaceholder: "Buscar plato o bebida...",
+    all: "Todos",
+    noProducts: "No se encontraron productos",
+    customizable: "Personalizable",
+    outOfStock: "Agotado",
+    price: "Precio",
+    add: "AGREGAR",
+    viewCart: "Ver Carrito",
+    poweredBy: "Pedidos interactivos por mesa — Potenciado por CMOR FLOW",
+    yourCart: "Tu Carrito",
+    cartEmpty: "Tu carrito está vacío",
+    size: "Tamaño",
+    addons: "Agregados",
+    total: "Total",
+    proceedToCheckout: "Proceder al Pago / Envío",
+    selectSize: "Selecciona el Tamaño",
+    addonsOptional: "Agregados Adicionales (Opcional)",
+    addToCart: "Agregar al Carrito",
+    orderSent: "¡Pedido Enviado!",
+    orderSuccess: "¡Pedido Exitoso!",
+    orderSuccessDesc: "Tu pedido ha sido recibido por la cocina. Estará listo a la brevedad.",
+    close: "Cerrar",
+    sendOrder: "Enviar Pedido",
+    deliveryOption: "Opción de Entrega",
+    dineIn: "Consumo en Local",
+    takeaway: "Para Llevar",
+    tableNumber: "Número de Mesa",
+    tableNumberPlaceholder: "Ej: Mesa 4, Barra, Terraza 2",
+    yourName: "Tu Nombre",
+    yourNamePlaceholder: "Escribe tu nombre",
+    phoneNumber: "Número de Teléfono",
+    phoneNumberPlaceholder: "Ej: +56912345678",
+    phoneHelper: "Te contactaremos a este número si hay alguna duda con tu orden",
+    specialInstructions: "Comentarios o Indicaciones Especiales (Opcional)",
+    specialInstructionsPlaceholder: "Ej: Sin cebolla, aderezos aparte, servilletas extra...",
+    orderSummary: "Resumen de tu Pedido",
+    subtotal: "Subtotal",
+    tax: "IVA (19%)",
+    cancel: "Cancelar",
+    confirmOrder: "Confirmar y Enviar Pedido",
+    errorName: "Por favor ingresa tu nombre",
+    errorPhone: "Por favor ingresa un número de teléfono válido",
+    errorTable: "Por favor indica tu número de mesa",
+    errorSubmit: "No se pudo realizar el pedido",
+  },
+  en: {
+    loading: "Loading digital menu...",
+    notFound: "Restaurant not found",
+    notFoundDesc: "The restaurant you are trying to access does not exist or is not active.",
+    open: "Open",
+    qrOrders: "Instant QR table ordering",
+    fastPrep: "⚡ Fast Prep",
+    securePayment: "💳 Secure POS Payment",
+    searchPlaceholder: "Search dish or beverage...",
+    all: "All",
+    noProducts: "No products found",
+    customizable: "Customizable",
+    outOfStock: "Out of Stock",
+    price: "Price",
+    add: "ADD",
+    viewCart: "View Cart",
+    poweredBy: "Interactive table ordering — Powered by CMOR FLOW",
+    yourCart: "Your Cart",
+    cartEmpty: "Your cart is empty",
+    size: "Size",
+    addons: "Addons",
+    total: "Total",
+    proceedToCheckout: "Proceed to Checkout",
+    selectSize: "Select Size",
+    addonsOptional: "Additional Addons (Optional)",
+    addToCart: "Add to Cart",
+    orderSent: "Order Sent!",
+    orderSuccess: "Success!",
+    orderSuccessDesc: "Your order has been received by the kitchen. It will be ready shortly.",
+    close: "Close",
+    sendOrder: "Send Order",
+    deliveryOption: "Delivery Option",
+    dineIn: "Dine In",
+    takeaway: "Takeaway",
+    tableNumber: "Table Number",
+    tableNumberPlaceholder: "e.g. Table 4, Bar, Terrace 2",
+    yourName: "Your Name",
+    yourNamePlaceholder: "Write your name",
+    phoneNumber: "Phone Number",
+    phoneNumberPlaceholder: "e.g. +56912345678",
+    phoneHelper: "We will contact you at this number if there are questions about your order",
+    specialInstructions: "Special Comments or Instructions (Optional)",
+    specialInstructionsPlaceholder: "e.g. No onions, dressings on the side, extra napkins...",
+    orderSummary: "Order Summary",
+    subtotal: "Subtotal",
+    tax: "VAT (19%)",
+    cancel: "Cancel",
+    confirmOrder: "Confirm & Send Order",
+    errorName: "Please enter your name",
+    errorPhone: "Please enter a valid phone number",
+    errorTable: "Please enter your table number",
+    errorSubmit: "Failed to place order",
+  }
+};
+
+const ImageCarousel: React.FC<{ images: string[]; alt: string }> = ({ images, alt }) => {
+  const [activeIndex, setActiveIndex] = useState(0);
+
+  const handlePrev = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setActiveIndex((prev) => (prev === 0 ? images.length - 1 : prev - 1));
+  };
+
+  const handleNext = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setActiveIndex((prev) => (prev === images.length - 1 ? 0 : prev + 1));
+  };
+
+  return (
+    <div className="relative w-full h-56 overflow-hidden rounded-xl bg-gray-100 group shadow-md">
+      <div 
+        className="flex w-full h-full transition-transform duration-300 ease-in-out"
+        style={{ transform: `translateX(-${activeIndex * 100}%)` }}
+      >
+        {images.map((img, idx) => (
+          <img
+            key={idx}
+            src={img}
+            alt={`${alt} - ${idx + 1}`}
+            className="w-full h-full object-cover flex-shrink-0"
+          />
+        ))}
+      </div>
+
+      {images.length > 1 && (
+        <>
+          <button
+            type="button"
+            onClick={handlePrev}
+            className="absolute left-2 top-1/2 -translate-y-1/2 bg-black/40 hover:bg-black/60 text-white rounded-full p-2 backdrop-blur-xs transition-opacity opacity-0 group-hover:opacity-100 md:opacity-100 active:scale-95 z-10 flex items-center justify-center"
+          >
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M15 19l-7-7 7-7" />
+            </svg>
+          </button>
+          <button
+            type="button"
+            onClick={handleNext}
+            className="absolute right-2 top-1/2 -translate-y-1/2 bg-black/40 hover:bg-black/60 text-white rounded-full p-2 backdrop-blur-xs transition-opacity opacity-0 group-hover:opacity-100 md:opacity-100 active:scale-95 z-10 flex items-center justify-center"
+          >
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M9 5l7 7-7 7" />
+            </svg>
+          </button>
+
+          <div className="absolute bottom-3 left-1/2 -translate-x-1/2 flex space-x-1.5 z-10">
+            {images.map((_, idx) => (
+              <button
+                key={idx}
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setActiveIndex(idx);
+                }}
+                className={`w-2 h-2 rounded-full transition-all ${
+                  activeIndex === idx ? "bg-white w-4" : "bg-white/50"
+                }`}
+              />
+            ))}
+          </div>
+        </>
+      )}
+    </div>
+  );
+};
+
+const getItemTags = (item: MenuItem, lang: "es" | "en" = "es") => {
   const tags: { label: string; colorClass: string }[] = [];
   const text = ((item.name || "") + " " + (item.description || "")).toLowerCase();
   
   if (text.includes("vegano") || text.includes("vegan")) {
-    tags.push({ label: "Vegano", colorClass: "bg-emerald-50 text-emerald-700 border-emerald-100" });
+    tags.push({ label: lang === "es" ? "Vegano" : "Vegan", colorClass: "bg-emerald-50 text-emerald-700 border-emerald-100" });
   } else if (text.includes("vegetari") || text.includes("margherita") || text.includes("queso")) {
-    tags.push({ label: "Vegetariano", colorClass: "bg-green-50 text-green-700 border-green-100" });
+    tags.push({ label: lang === "es" ? "Vegetariano" : "Vegetarian", colorClass: "bg-green-50 text-green-700 border-green-100" });
   }
   
   if (text.includes("sin gluten") || text.includes("gluten-free") || text.includes("celiac")) {
-    tags.push({ label: "Sin Gluten", colorClass: "bg-sky-50 text-sky-700 border-sky-100" });
+    tags.push({ label: lang === "es" ? "Sin Gluten" : "Gluten Free", colorClass: "bg-sky-50 text-sky-700 border-sky-100" });
   }
   
   if (text.includes("picante") || text.includes("ají") || text.includes("hot") || text.includes("chili")) {
-    tags.push({ label: "🌶️ Picante", colorClass: "bg-rose-50 text-rose-700 border-rose-100" });
+    tags.push({ label: lang === "es" ? "🌶️ Picante" : "🌶️ Spicy", colorClass: "bg-rose-50 text-rose-700 border-rose-100" });
   }
   
   if (text.includes("chef") || text.includes("recomend") || text.includes("especial") || text.includes("pizza margherita") || text.includes("vegana")) {
-    tags.push({ label: "⭐ Destacado", colorClass: "bg-amber-50 text-amber-700 border-amber-100" });
+    tags.push({ label: lang === "es" ? "⭐ Destacado" : "⭐ Featured", colorClass: "bg-amber-50 text-amber-700 border-amber-100" });
   }
   
   return tags;
@@ -72,6 +253,59 @@ const CustomerMenu: React.FC = () => {
   const [showCheckout, setShowCheckout] = useState(false);
   const [selectedItem, setSelectedItem] = useState<MenuItem | null>(null);
   const [showItemModal, setShowItemModal] = useState(false);
+
+  const [lang, setLang] = useState<"es" | "en">("es");
+  const [activeCurrency, setActiveCurrency] = useState<string>("CLP");
+
+  useEffect(() => {
+    if (restaurant) {
+      setLang((restaurant.default_language as "es" | "en") || "es");
+      setActiveCurrency(restaurant.currency || "CLP");
+    }
+  }, [restaurant]);
+
+  const formatCurrency = (amount: number | undefined | null) => {
+    return baseFormatCurrency(amount, activeCurrency, restaurant?.usd_exchange_rate || 950);
+  };
+
+  const t = (key: keyof typeof TRANSLATIONS.es) => {
+    return TRANSLATIONS[lang]?.[key] || TRANSLATIONS.es[key] || "";
+  };
+
+  const translateText = (text: string) => {
+    if (lang === "es" || !text) return text;
+    const dict: Record<string, string> = {
+      "Pizza Margherita": "Margherita Pizza",
+      "Deliciosa pizza con salsa de tomate natural, queso mozzarella y albahaca fresca.": "Delicious pizza with natural tomato sauce, mozzarella cheese, and fresh basil.",
+      "Masa delgada": "Thin crust",
+      "Familiar": "Family size",
+      "Queso extra": "Extra cheese",
+      "Champiñones": "Mushrooms",
+      "Sushi Roll": "Sushi Roll",
+      "Roll de salmón y palta envuelto en sésamo.": "Salmon and avocado roll wrapped in sesame.",
+      "9 piezas": "9 pieces",
+      "Salsa teriyaki": "Teriyaki sauce",
+      "Salsa spicy": "Spicy sauce",
+      "Hamburguesa Clásica": "Classic Burger",
+      "Hamburguesa con queso cheddar, lechuga, tomate y salsa especial.": "Burger with cheddar cheese, lettuce, tomato, and special sauce.",
+      "Simple": "Single patty",
+      "Doble": "Double patty",
+      "Papas fritas": "French fries",
+      "Bebida": "Soft Drink",
+      "Bebida en lata 350ml.": "Canned soda 350ml.",
+      "Normal": "Regular",
+      "Zero": "Zero sugar",
+      "Todos": "All",
+      "Entradas": "Appetizers",
+      "Platos Fuertes": "Entrées",
+      "Postres": "Desserts",
+      "Bebidas": "Drinks",
+      "Pizzas": "Pizzas",
+      "Sushi": "Sushi",
+      "Hamburguesas": "Burgers",
+    };
+    return dict[text] || text;
+  };
 
   // Load restaurant and menu
   useEffect(() => {
@@ -189,7 +423,7 @@ const CustomerMenu: React.FC = () => {
   };
 
   if (loading) {
-    return <Loading text="Cargando la carta digital..." />;
+    return <Loading text={t("loading")} />;
   }
 
   if (!restaurant) {
@@ -198,10 +432,10 @@ const CustomerMenu: React.FC = () => {
         <Card className="text-center p-8 flex flex-col items-center max-w-md">
           <Package className="w-16 h-16 text-text-secondary mx-auto mb-4 opacity-50" />
           <h2 className="text-2xl font-bold text-text mb-2">
-            Restaurante no encontrado
+            {t("notFound")}
           </h2>
           <p className="text-text-secondary">
-            El restaurante al que intentas acceder no existe o no se encuentra activo.
+            {t("notFoundDesc")}
           </p>
         </Card>
       </div>
@@ -259,7 +493,7 @@ const CustomerMenu: React.FC = () => {
                   {restaurant.name}
                 </h1>
                 <span className="bg-success/10 text-success text-xs font-bold px-2 py-0.5 rounded-full border border-success/20">
-                  Abierto
+                  {t("open")}
                 </span>
               </div>
               <p className="text-sm text-gray-500 mt-1 flex items-center gap-1.5">
@@ -267,13 +501,13 @@ const CustomerMenu: React.FC = () => {
                 <span>•</span>
                 <span>Santiago, Chile</span>
               </p>
-              <p className="text-xs text-gray-400 mt-0.5">Pedidos por Mesa con QR instantáneo</p>
+              <p className="text-xs text-gray-400 mt-0.5">{t("qrOrders")}</p>
             </div>
           </div>
 
           <div className="flex flex-wrap gap-2 text-xs border-t border-gray-100 pt-3 md:border-t-0 md:pt-0">
-            <span className="px-3 py-1.5 bg-gray-50 rounded-lg text-gray-650 font-medium">⚡ Preparación Rápida</span>
-            <span className="px-3 py-1.5 bg-gray-50 rounded-lg text-gray-650 font-medium">💳 Pago Seguro POS</span>
+            <span className="px-3 py-1.5 bg-gray-50 rounded-lg text-gray-650 font-medium">{t("fastPrep")}</span>
+            <span className="px-3 py-1.5 bg-gray-50 rounded-lg text-gray-650 font-medium">{t("securePayment")}</span>
           </div>
         </div>
       </div>
@@ -281,18 +515,41 @@ const CustomerMenu: React.FC = () => {
       {/* Sticky Header with Search and Categories */}
       <div className="bg-white shadow-sm border-b sticky top-0 z-40">
         <div className="max-w-screen-lg mx-auto px-4 py-3 space-y-3">
-          <div className="flex items-center justify-between gap-4">
+          <div className="flex flex-wrap items-center justify-between gap-3">
             <div className="flex items-center gap-2 flex-shrink-0">
               <div className="w-8 h-8 rounded-lg bg-accent flex items-center justify-center font-bold text-white text-sm">
                 {restaurant.name.charAt(0)}
               </div>
               <span className="font-extrabold text-sm text-gray-800 hidden sm:inline">{restaurant.name}</span>
             </div>
-            <div className="relative flex-1 max-w-md">
+
+            <div className="flex items-center gap-2 ml-auto">
+              {/* Language Selector */}
+              <select
+                value={lang}
+                onChange={(e) => setLang(e.target.value as "es" | "en")}
+                className="bg-gray-50 border border-gray-200 text-gray-700 text-xs rounded-lg px-2.5 py-1.5 focus:outline-none focus:ring-1 focus:ring-accent font-bold cursor-pointer hover:bg-gray-100 transition-colors"
+              >
+                <option value="es">🇪🇸 ES</option>
+                <option value="en">🇺🇸 EN</option>
+              </select>
+
+              {/* Currency Selector */}
+              <select
+                value={activeCurrency}
+                onChange={(e) => setActiveCurrency(e.target.value)}
+                className="bg-gray-50 border border-gray-200 text-gray-700 text-xs rounded-lg px-2.5 py-1.5 focus:outline-none focus:ring-1 focus:ring-accent font-bold cursor-pointer hover:bg-gray-100 transition-colors"
+              >
+                <option value="CLP">CLP ($)</option>
+                <option value="USD">USD ($)</option>
+              </select>
+            </div>
+
+            <div className="relative flex-1 max-w-md min-w-[200px]">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
               <input
                 type="text"
-                placeholder="Buscar plato o bebida..."
+                placeholder={t("searchPlaceholder")}
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 className="w-full pl-10 pr-4 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-accent/20"
@@ -312,7 +569,7 @@ const CustomerMenu: React.FC = () => {
                     : "bg-gray-100 text-gray-600 hover:bg-gray-200"
                 }`}
               >
-                {category === "all" ? "Todos" : category}
+                {category === "all" ? t("all") : translateText(category)}
               </button>
             ))}
           </div>
@@ -323,7 +580,7 @@ const CustomerMenu: React.FC = () => {
       <div className="max-w-screen-lg mx-auto px-4 py-4">
         {filteredItems.length === 0 ? (
           <div className="text-center py-20">
-            <p className="text-gray-400 text-sm">No se encontraron productos</p>
+            <p className="text-gray-400 text-sm">{t("noProducts")}</p>
           </div>
         ) : (
           <div className="grid grid-cols-2 gap-3">
@@ -343,7 +600,7 @@ const CustomerMenu: React.FC = () => {
                       {item.image_url ? (
                         <img
                           src={item.image_url}
-                          alt={item.name}
+                          alt={translateText(item.name)}
                           loading="lazy"
                           className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                         />
@@ -355,14 +612,14 @@ const CustomerMenu: React.FC = () => {
                       {hasVariations && (
                         <div className="absolute top-2 left-2">
                           <span className="bg-black/60 backdrop-blur-xs text-white text-[10px] font-bold px-2 py-0.5 rounded-full">
-                            Personalizable
+                            {t("customizable")}
                           </span>
                         </div>
                       )}
                       {!item.is_available && (
                         <div className="absolute inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center">
                           <span className="bg-red-500 text-white text-xs font-bold px-2.5 py-1 rounded-full shadow-sm">
-                            Agotado
+                            {t("outOfStock")}
                           </span>
                         </div>
                       )}
@@ -370,13 +627,13 @@ const CustomerMenu: React.FC = () => {
 
                     <div className="p-3 space-y-1.5">
                       <h3 className="font-bold text-sm text-gray-900 line-clamp-2 group-hover:text-accent transition-colors leading-tight">
-                        {item.name}
+                        {translateText(item.name)}
                       </h3>
                       
                       {/* Dynamic food tags */}
-                      {getItemTags(item).length > 0 && (
+                      {getItemTags(item, lang).length > 0 && (
                         <div className="flex flex-wrap gap-1">
-                          {getItemTags(item).map((tag, idx) => (
+                          {getItemTags(item, lang).map((tag, idx) => (
                             <span key={idx} className={`text-[10px] px-1.5 py-0.5 rounded font-bold border ${tag.colorClass}`}>
                               {tag.label}
                             </span>
@@ -386,7 +643,7 @@ const CustomerMenu: React.FC = () => {
 
                       {item.description && (
                         <p className="text-xs text-gray-400 line-clamp-2 leading-snug">
-                          {item.description}
+                          {translateText(item.description)}
                         </p>
                       )}
                     </div>
@@ -395,7 +652,7 @@ const CustomerMenu: React.FC = () => {
                   <div className="p-3 pt-0">
                     <div className="flex items-center justify-between pt-2 border-t border-gray-50">
                       <div>
-                        <span className="text-[10px] text-gray-400 block font-semibold leading-none mb-0.5">Precio</span>
+                        <span className="text-[10px] text-gray-400 block font-semibold leading-none mb-0.5">{t("price")}</span>
                         <p className="font-extrabold text-sm text-gray-900">
                           {item.sizes && item.sizes.length > 0
                             ? formatCurrency(
@@ -417,7 +674,7 @@ const CustomerMenu: React.FC = () => {
                               }
                               className="px-4 py-1.5 border border-accent text-accent font-extrabold text-xs rounded-lg hover:bg-accent hover:text-white active:scale-95 transition-all shadow-sm shadow-accent/5"
                             >
-                              AGREGAR
+                              {t("add")}
                             </button>
                           ) : (
                             <div className="flex items-center bg-accent text-white rounded-lg shadow-sm">
@@ -457,7 +714,7 @@ const CustomerMenu: React.FC = () => {
       <div className="py-12 flex flex-col items-center justify-center gap-2 border-t border-border mt-12 text-center max-w-screen-lg mx-auto px-4">
         <CmorFlowLogo size="sm" showText={true} />
         <p className="text-xs text-text-secondary">
-          Pedidos interactivos por mesa — Potenciado por CMOR FLOW
+          {t("poweredBy")}
         </p>
       </div>
 
@@ -472,6 +729,9 @@ const CustomerMenu: React.FC = () => {
           setShowCart(false);
           setShowCheckout(true);
         }}
+        lang={lang}
+        activeCurrency={activeCurrency}
+        exchangeRate={restaurant?.usd_exchange_rate || 950}
       />
 
       {/* Item Customization Modal */}
@@ -480,6 +740,9 @@ const CustomerMenu: React.FC = () => {
         item={selectedItem}
         onClose={() => setShowItemModal(false)}
         onAdd={addToCart}
+        lang={lang}
+        activeCurrency={activeCurrency}
+        exchangeRate={restaurant?.usd_exchange_rate || 950}
       />
 
       {/* Checkout Modal */}
@@ -492,6 +755,9 @@ const CustomerMenu: React.FC = () => {
           setCart([]);
           setShowCheckout(false);
         }}
+        lang={lang}
+        activeCurrency={activeCurrency}
+        exchangeRate={restaurant?.usd_exchange_rate || 950}
       />
 
       {/* Bottom Cart Bar */}
@@ -515,7 +781,7 @@ const CustomerMenu: React.FC = () => {
               </span>
             </div>
             <div className="flex items-center gap-2 font-semibold text-sm">
-              <span>Ver Carrito</span>
+              <span>{t("viewCart")}</span>
               <span className="text-lg">›</span>
             </div>
           </button>
@@ -535,6 +801,9 @@ interface CartModalProps {
   onUpdateQuantity: (index: number, delta: number) => void;
   onRemove: (index: number) => void;
   onCheckout: () => void;
+  lang: "es" | "en";
+  activeCurrency: string;
+  exchangeRate: number;
 }
 
 const CartModal: React.FC<CartModalProps> = ({
@@ -544,19 +813,49 @@ const CartModal: React.FC<CartModalProps> = ({
   onUpdateQuantity,
   onRemove,
   onCheckout,
+  lang,
+  activeCurrency,
+  exchangeRate,
 }) => {
+  const formatCurrency = (amount: number | undefined | null) => {
+    return baseFormatCurrency(amount, activeCurrency, exchangeRate);
+  };
+
+  const t = (key: keyof typeof TRANSLATIONS.es) => {
+    return TRANSLATIONS[lang]?.[key] || TRANSLATIONS.es[key] || "";
+  };
+
+  const translateText = (text: string) => {
+    if (lang === "es" || !text) return text;
+    const dict: Record<string, string> = {
+      "Masa delgada": "Thin crust",
+      "Familiar": "Family size",
+      "Queso extra": "Extra cheese",
+      "Champiñones": "Mushrooms",
+      "9 piezas": "9 pieces",
+      "Salsa teriyaki": "Teriyaki sauce",
+      "Salsa spicy": "Spicy sauce",
+      "Simple": "Single patty",
+      "Doble": "Double patty",
+      "Papas fritas": "French fries",
+      "Normal": "Regular",
+      "Zero": "Zero sugar",
+    };
+    return dict[text] || text;
+  };
+
   const total = cart.reduce(
     (sum, item) => sum + item.itemTotal * item.quantity,
     0
   );
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose} title="Tu Carrito" size="lg">
+    <Modal isOpen={isOpen} onClose={onClose} title={t("yourCart")} size="lg">
       <div className="space-y-6">
         {cart.length === 0 ? (
           <div className="text-center py-8">
             <ShoppingCart className="w-16 h-16 text-text-secondary mx-auto mb-4 opacity-50" />
-            <p className="text-text-secondary">Tu carrito está vacío</p>
+            <p className="text-text-secondary">{t("cartEmpty")}</p>
           </div>
         ) : (
           <>
@@ -567,16 +866,16 @@ const CartModal: React.FC<CartModalProps> = ({
                   className="flex items-start space-x-4 p-4 bg-bg-subtle rounded-lg"
                 >
                   <div className="flex-1">
-                    <h4 className="font-semibold text-text">{item.name}</h4>
+                    <h4 className="font-semibold text-text">{translateText(item.name)}</h4>
                     {item.selectedSize && (
                       <p className="text-sm text-text-secondary">
-                        Tamaño: {item.selectedSize.name}
+                        {lang === "es" ? "Tamaño" : "Size"}: {translateText(item.selectedSize.name)}
                       </p>
                     )}
                     {item.selectedAddons.length > 0 && (
                       <p className="text-sm text-text-secondary">
-                        Agregados:{" "}
-                        {item.selectedAddons.map((a) => a.name).join(", ")}
+                        {lang === "es" ? "Agregados" : "Addons"}:{" "}
+                        {item.selectedAddons.map((a) => translateText(a.name)).join(", ")}
                       </p>
                     )}
                     <p className="text-accent font-semibold mt-1">
@@ -612,11 +911,11 @@ const CartModal: React.FC<CartModalProps> = ({
 
             <div className="border-t border-border pt-4">
               <div className="flex justify-between text-xl font-bold text-text mb-4">
-                <span>Total</span>
+                <span>{t("total")}</span>
                 <span>{formatCurrency(total)}</span>
               </div>
               <Button onClick={onCheckout} fullWidth size="lg">
-                Proceder al Pago / Envío
+                {t("proceedToCheckout")}
               </Button>
             </div>
           </>
@@ -632,6 +931,9 @@ interface ItemCustomizationModalProps {
   item: MenuItem | null;
   onClose: () => void;
   onAdd: (item: MenuItem, selectedSize?: any, selectedAddons?: any[]) => void;
+  lang: "es" | "en";
+  activeCurrency: string;
+  exchangeRate: number;
 }
 
 const ItemCustomizationModal: React.FC<ItemCustomizationModalProps> = ({
@@ -639,6 +941,9 @@ const ItemCustomizationModal: React.FC<ItemCustomizationModalProps> = ({
   item,
   onClose,
   onAdd,
+  lang,
+  activeCurrency,
+  exchangeRate,
 }) => {
   const [selectedSize, setSelectedSize] = useState<any>(null);
   const [selectedAddons, setSelectedAddons] = useState<any[]>([]);
@@ -648,6 +953,41 @@ const ItemCustomizationModal: React.FC<ItemCustomizationModalProps> = ({
       setSelectedSize(item.sizes[0]);
     }
   }, [item]);
+
+  const formatCurrency = (amount: number | undefined | null) => {
+    return baseFormatCurrency(amount, activeCurrency, exchangeRate);
+  };
+
+  const t = (key: keyof typeof TRANSLATIONS.es) => {
+    return TRANSLATIONS[lang]?.[key] || TRANSLATIONS.es[key] || "";
+  };
+
+  const translateText = (text: string) => {
+    if (lang === "es" || !text) return text;
+    const dict: Record<string, string> = {
+      "Pizza Margherita": "Margherita Pizza",
+      "Deliciosa pizza con salsa de tomate natural, queso mozzarella y albahaca fresca.": "Delicious pizza with natural tomato sauce, mozzarella cheese, and fresh basil.",
+      "Masa delgada": "Thin crust",
+      "Familiar": "Family size",
+      "Queso extra": "Extra cheese",
+      "Champiñones": "Mushrooms",
+      "Sushi Roll": "Sushi Roll",
+      "Roll de salmón y palta envuelto en sésamo.": "Salmon and avocado roll wrapped in sesame.",
+      "9 piezas": "9 pieces",
+      "Salsa teriyaki": "Teriyaki sauce",
+      "Salsa spicy": "Spicy sauce",
+      "Hamburguesa Clásica": "Classic Burger",
+      "Hamburguesa con queso cheddar, lechuga, tomate y salsa especial.": "Burger with cheddar cheese, lettuce, tomato, and special sauce.",
+      "Simple": "Single patty",
+      "Doble": "Double patty",
+      "Papas fritas": "French fries",
+      "Bebida": "Soft Drink",
+      "Bebida en lata 350ml.": "Canned soda 350ml.",
+      "Normal": "Regular",
+      "Zero": "Zero sugar",
+    };
+    return dict[text] || text;
+  };
 
   if (!item) return null;
 
@@ -669,25 +1009,27 @@ const ItemCustomizationModal: React.FC<ItemCustomizationModalProps> = ({
   };
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose} title={item.name} size="md">
+    <Modal isOpen={isOpen} onClose={onClose} title={translateText(item.name)} size="md">
       <div className="space-y-6">
-        {item.image_url && (
+        {item.image_urls && item.image_urls.length > 1 ? (
+          <ImageCarousel images={item.image_urls} alt={item.name} />
+        ) : item.image_url ? (
           <img
             src={item.image_url}
-            alt={item.name}
+            alt={translateText(item.name)}
             loading="lazy"
             className="w-full h-48 object-cover rounded-lg"
           />
-        )}
+        ) : null}
 
         {item.description && (
-          <p className="text-text-secondary">{item.description}</p>
+          <p className="text-text-secondary">{translateText(item.description)}</p>
         )}
 
         {/* Sizes */}
         {item.sizes && item.sizes.length > 0 && (
           <div>
-            <h4 className="font-semibold text-text mb-3">Selecciona el Tamaño</h4>
+            <h4 className="font-semibold text-text mb-3">{t("selectSize")}</h4>
             <div className="space-y-2">
               {item.sizes.map((size) => (
                 <button
@@ -699,7 +1041,7 @@ const ItemCustomizationModal: React.FC<ItemCustomizationModalProps> = ({
                       : "border-border hover:border-accent/50"
                   }`}
                 >
-                  <span className="font-medium text-text">{size.name}</span>
+                  <span className="font-medium text-text">{translateText(size.name)}</span>
                   <span className="text-accent font-semibold">
                     {formatCurrency(size.price)}
                   </span>
@@ -712,7 +1054,7 @@ const ItemCustomizationModal: React.FC<ItemCustomizationModalProps> = ({
         {/* Addons */}
         {item.addons && item.addons.length > 0 && (
           <div>
-            <h4 className="font-semibold text-text mb-3">Agregados Adicionales (Opcional)</h4>
+            <h4 className="font-semibold text-text mb-3">{t("addonsOptional")}</h4>
             <div className="space-y-2">
               {item.addons.map((addon) => (
                 <button
@@ -724,7 +1066,7 @@ const ItemCustomizationModal: React.FC<ItemCustomizationModalProps> = ({
                       : "border-border hover:border-accent/50"
                   }`}
                 >
-                  <span className="font-medium text-text">{addon.name}</span>
+                  <span className="font-medium text-text">{translateText(addon.name)}</span>
                   <span className="text-accent font-semibold">
                     +{formatCurrency(addon.price)}
                   </span>
@@ -736,7 +1078,7 @@ const ItemCustomizationModal: React.FC<ItemCustomizationModalProps> = ({
 
         <div className="border-t border-border pt-4">
           <div className="flex justify-between text-xl font-bold text-text mb-4">
-            <span>Total</span>
+            <span>{t("total")}</span>
             <span>{formatCurrency(calculateTotal())}</span>
           </div>
           <Button
@@ -744,7 +1086,7 @@ const ItemCustomizationModal: React.FC<ItemCustomizationModalProps> = ({
             fullWidth
             size="lg"
           >
-            Agregar al Carrito
+            {t("addToCart")}
           </Button>
         </div>
       </div>
@@ -759,6 +1101,9 @@ interface CheckoutModalProps {
   restaurantId: string;
   onClose: () => void;
   onSuccess: () => void;
+  lang: "es" | "en";
+  activeCurrency: string;
+  exchangeRate: number;
 }
 
 const CheckoutModal: React.FC<CheckoutModalProps> = ({
@@ -767,6 +1112,9 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
   restaurantId,
   onClose,
   onSuccess,
+  lang,
+  activeCurrency,
+  exchangeRate,
 }) => {
   const [customerName, setCustomerName] = useState("");
   const [customerPhone, setCustomerPhone] = useState("");
@@ -777,29 +1125,61 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
   const [error, setError] = useState("");
   const [success, setSuccess] = useState(false);
 
-  const subtotal = cart.reduce(
+  const formatCurrency = (amount: number | undefined | null) => {
+    return baseFormatCurrency(amount, activeCurrency, exchangeRate);
+  };
+
+  const t = (key: keyof typeof TRANSLATIONS.es) => {
+    return TRANSLATIONS[lang]?.[key] || TRANSLATIONS.es[key] || "";
+  };
+
+  const translateText = (text: string) => {
+    if (lang === "es" || !text) return text;
+    const dict: Record<string, string> = {
+      "Pizza Margherita": "Margherita Pizza",
+      "Masa delgada": "Thin crust",
+      "Familiar": "Family size",
+      "Queso extra": "Extra cheese",
+      "Champiñones": "Mushrooms",
+      "Sushi Roll": "Sushi Roll",
+      "9 piezas": "9 pieces",
+      "Salsa teriyaki": "Teriyaki sauce",
+      "Salsa spicy": "Spicy sauce",
+      "Hamburguesa Clásica": "Classic Burger",
+      "Simple": "Single patty",
+      "Doble": "Double patty",
+      "Papas fritas": "French fries",
+      "Bebida": "Soft Drink",
+      "Normal": "Regular",
+      "Zero": "Zero sugar",
+    };
+    return dict[text] || text;
+  };
+
+  // Calculate pricing (VAT inclusive)
+  const total = cart.reduce(
     (sum, item) => sum + item.itemTotal * item.quantity,
     0
   );
-  const tax = subtotal * APP_CONFIG.taxRate; // 19% IVA (Chile)
-  const total = subtotal + tax;
+  const subtotal = total / 1.19;
+  const tax = total - subtotal;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
 
     if (!customerName.trim()) {
-      setError("Por favor ingresa tu nombre");
+      setError(t("errorName"));
       return;
     }
 
     if (!customerPhone.trim() || customerPhone.replace(/[\s\-()]/g, "").length < 8) {
-      setError("Por favor ingresa un número de teléfono válido");
+      setError(t("errorPhone"));
       return;
     }
 
     if (orderType === "table" && !tableNumber.trim()) {
-      setError("Por favor indica tu número de mesa");
+      setError(t("errorTable"));
       return;
     }
 
@@ -839,7 +1219,7 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
         resetForm();
       }, 2000);
     } else {
-      setError(orderError?.message || "No se pudo realizar el pedido");
+      setError(orderError?.message || t("errorSubmit"));
     }
   };
 
@@ -854,17 +1234,17 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
 
   if (success) {
     return (
-      <Modal isOpen={isOpen} onClose={onClose} title="¡Pedido Enviado!" size="md">
+      <Modal isOpen={isOpen} onClose={onClose} title={t("orderSent")} size="md">
         <div className="text-center py-8">
           <CheckCircle className="w-16 h-16 text-success mx-auto mb-4" />
           <h3 className="text-2xl font-bold text-text mb-2">
-            ¡Pedido Exitoso!
+            {t("orderSuccess")}
           </h3>
           <p className="text-text-secondary mb-6">
-            Tu pedido ha sido recibido por la cocina. Estará listo a la brevedad.
+            {t("orderSuccessDesc")}
           </p>
           <Button onClick={onClose} fullWidth>
-            Cerrar
+            {t("close")}
           </Button>
         </div>
       </Modal>
@@ -872,13 +1252,13 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
   }
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose} title="Enviar Pedido" size="lg">
+    <Modal isOpen={isOpen} onClose={onClose} title={t("sendOrder")} size="lg">
       <form onSubmit={handleSubmit} className="space-y-6">
         {error && <Alert type="error" message={error} />}
 
         {/* Order Type */}
         <div>
-          <label className="label mb-3">Opción de Entrega</label>
+          <label className="label mb-3">{t("deliveryOption")}</label>
           <div className="grid grid-cols-2 gap-3">
             <button
               type="button"
@@ -889,7 +1269,7 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
                   : "border-border hover:border-accent/50"
               }`}
             >
-              Consumo en Local
+              {t("dineIn")}
             </button>
             <button
               type="button"
@@ -900,7 +1280,7 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
                   : "border-border hover:border-accent/50"
               }`}
             >
-              Para Llevar
+              {t("takeaway")}
             </button>
           </div>
         </div>
@@ -908,40 +1288,40 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
         {/* Table Number (only for table orders) */}
         {orderType === "table" && (
           <Input
-            label="Número de Mesa"
+            label={t("tableNumber")}
             value={tableNumber}
             onChange={(e) => setTableNumber(e.target.value)}
-            placeholder="Ej: Mesa 4, Barra, Terraza 2"
+            placeholder={t("tableNumberPlaceholder")}
             required
           />
         )}
 
         {/* Customer Details */}
         <Input
-          label="Tu Nombre"
+          label={t("yourName")}
           value={customerName}
           onChange={(e) => setCustomerName(e.target.value)}
-          placeholder="Escribe tu nombre"
+          placeholder={t("yourNamePlaceholder")}
           required
         />
 
         <Input
-          label="Número de Teléfono"
+          label={t("phoneNumber")}
           type="tel"
           value={customerPhone}
           onChange={(e) => setCustomerPhone(e.target.value)}
-          placeholder="Ej: +56912345678"
+          placeholder={t("phoneNumberPlaceholder")}
           required
-          helperText="Te contactaremos a este número si hay alguna duda con tu orden"
+          helperText={t("phoneHelper")}
         />
 
         {/* Special Instructions */}
         <div>
-          <label className="label mb-2">Comentarios o Indicaciones Especiales (Opcional)</label>
+          <label className="label mb-2">{t("specialInstructions")}</label>
           <textarea
             value={notes}
             onChange={(e) => setNotes(e.target.value)}
-            placeholder="Ej: Sin cebolla, aderezos aparte, servilletas extra..."
+            placeholder={t("specialInstructionsPlaceholder")}
             rows={3}
             className="input-field"
           />
@@ -949,12 +1329,12 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
 
         {/* Order Summary */}
         <div className="bg-bg-subtle rounded-lg p-4 space-y-2">
-          <h4 className="font-semibold text-text mb-3">Resumen de tu Pedido</h4>
+          <h4 className="font-semibold text-text mb-3">{t("orderSummary")}</h4>
           {cart.map((item, index) => (
             <div key={index} className="flex justify-between text-sm">
               <span className="text-text-secondary">
-                {item.quantity}x {item.name}
-                {item.selectedSize && ` (${item.selectedSize.name})`}
+                {item.quantity}x {translateText(item.name)}
+                {item.selectedSize && ` (${translateText(item.selectedSize.name)})`}
               </span>
               <span className="text-text">
                 {formatCurrency(item.itemTotal * item.quantity)}
@@ -963,15 +1343,15 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
           ))}
           <div className="border-t border-border pt-2 mt-2 space-y-1">
             <div className="flex justify-between text-text-secondary text-xs">
-              <span>Subtotal</span>
+              <span>{t("subtotal")}</span>
               <span>{formatCurrency(subtotal)}</span>
             </div>
             <div className="flex justify-between text-text-secondary text-xs">
-              <span>IVA (19%)</span>
+              <span>{t("tax")}</span>
               <span>{formatCurrency(tax)}</span>
             </div>
             <div className="flex justify-between text-lg font-bold text-text pt-2 border-t border-border">
-              <span>Total</span>
+              <span>{t("total")}</span>
               <span>{formatCurrency(total)}</span>
             </div>
           </div>
@@ -980,10 +1360,10 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
         {/* Actions */}
         <div className="flex gap-3">
           <Button type="button" variant="outline" onClick={onClose} fullWidth>
-            Cancelar
+            {t("cancel")}
           </Button>
           <Button type="submit" loading={loading} fullWidth>
-            Confirmar y Enviar Pedido
+            {t("confirmOrder")}
           </Button>
         </div>
       </form>

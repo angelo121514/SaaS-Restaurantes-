@@ -42,6 +42,10 @@ export interface Restaurant {
   trial_ends_at?: string;
   created_at: string;
   updated_at: string;
+  currency?: "CLP" | "USD";
+  usd_exchange_rate?: number;
+  default_language?: "es" | "en";
+  default_prep_time?: number;
 }
 
 export interface User {
@@ -66,6 +70,7 @@ export interface MenuItem {
   sizes?: { name: string; price: number }[];
   addons?: { name: string; price: number }[];
   created_at: string;
+  image_urls?: string[];
 }
 
 export interface Customer {
@@ -218,6 +223,16 @@ export const DPO_EMAIL = "dpo@cmorflow.cl";
 // LOCAL STORAGE MOCK SUPABASE CLIENT
 // --------------------------------------------------------------------
 class MockSupabaseClient {
+  constructor() {
+    this.getStore("users");
+    this.getStore("admin_users");
+    this.getStore("restaurants");
+    this.getStore("menu_items");
+    this.getStore("registration_requests");
+    this.getStore("restaurant_customers");
+    this.getStore("orders");
+  }
+
   auth = {
     getSession: async () => {
       const sessionStr = localStorage.getItem("mock_supabase_session");
@@ -251,6 +266,26 @@ class MockSupabaseClient {
       localStorage.removeItem("user");
       localStorage.removeItem("admin");
       return { error: null };
+    },
+    resetPasswordForEmail: async (email: string, options?: { redirectTo?: string }) => {
+      console.log("Mock resetPasswordForEmail called with:", email, options);
+      const usersStore = JSON.parse(localStorage.getItem("mock_db_users") || "[]");
+      const dbUser = usersStore.find((u: any) => u.email.toLowerCase() === email.toLowerCase());
+      if (!dbUser) {
+        return { data: null, error: { message: "El correo electrónico no está registrado." } };
+      }
+      
+      const mockSession = {
+        user: {
+          id: dbUser.id,
+          email: dbUser.email,
+          user_metadata: { role: dbUser.role, restaurant_id: dbUser.restaurant_id },
+        },
+        access_token: "mock-reset-token",
+      };
+      localStorage.setItem("mock_supabase_session", JSON.stringify(mockSession));
+      
+      return { data: {}, error: null };
     },
     signInWithPassword: async (params: { email: string; password?: string }) => {
       console.log("Mock signInWithPassword called with:", params.email);
@@ -423,6 +458,34 @@ class MockSupabaseClient {
         if (userUpdated) {
           localStorage.setItem("mock_db_users", JSON.stringify(updatedUsers));
           localStorage.setItem("mock_db_admin_users", JSON.stringify(updatedAdminUsers));
+          
+          // Write legacy user or admin blob to localStorage to keep them logged in
+          const restaurantStore = JSON.parse(localStorage.getItem("mock_db_restaurants") || "[]");
+          const restaurant = restaurantStore.find((r: any) => r.id === session.user?.user_metadata?.restaurant_id);
+          
+          if (session.user?.user_metadata?.role === "admin") {
+            const legacyAdminBlob = {
+              id: userId,
+              email: userEmail,
+              role: "admin",
+              __exp: Date.now() + 1000 * 60 * 60 * 8, // 8 hours
+            };
+            localStorage.setItem("admin", JSON.stringify(legacyAdminBlob));
+          } else {
+            const legacyUserBlob = {
+              id: userId,
+              email: userEmail,
+              role: session.user?.user_metadata?.role || "owner",
+              restaurant_id: session.user?.user_metadata?.restaurant_id || null,
+              restaurant: restaurant ? {
+                name: restaurant.name,
+                slug: restaurant.slug,
+                is_active: restaurant.is_active,
+              } : null,
+              __exp: Date.now() + 1000 * 60 * 60 * 8, // 8 hours
+            };
+            localStorage.setItem("user", JSON.stringify(legacyUserBlob));
+          }
         } else {
           return { data: { user: null }, error: { message: "User not found in mock store to update password" } };
         }
@@ -500,6 +563,10 @@ class MockSupabaseClient {
             is_active: true,
             created_at: new Date(Date.now() - 86400000 * 5).toISOString(),
             updated_at: new Date().toISOString(),
+            currency: "CLP",
+            usd_exchange_rate: 950,
+            default_language: "es",
+            default_prep_time: 15,
           },
           {
             id: "demo-restaurant-id-2",
@@ -518,6 +585,10 @@ class MockSupabaseClient {
             created_at: new Date(Date.now() - 86400000 * 2).toISOString(),
             trial_ends_at: new Date(Date.now() + 86400000 * 8).toISOString(), // 8 days remaining
             updated_at: new Date().toISOString(),
+            currency: "CLP",
+            usd_exchange_rate: 950,
+            default_language: "es",
+            default_prep_time: 15,
           },
           {
             id: "sushi-restaurant-id",
@@ -535,6 +606,10 @@ class MockSupabaseClient {
             is_active: true,
             created_at: new Date(Date.now() - 86400000 * 10).toISOString(),
             updated_at: new Date().toISOString(),
+            currency: "CLP",
+            usd_exchange_rate: 950,
+            default_language: "es",
+            default_prep_time: 15,
           }
         ];
       case "users":
@@ -559,6 +634,11 @@ class MockSupabaseClient {
             base_price: 8500,
             category: "Pizzas",
             image_url: "https://images.unsplash.com/photo-1604382355076-af4b0eb60143?w=500",
+            image_urls: [
+              "https://images.unsplash.com/photo-1604382355076-af4b0eb60143?w=500",
+              "https://images.unsplash.com/photo-1513104890138-7c749659a591?w=500",
+              "https://images.unsplash.com/photo-1590947132387-155cc02f3212?w=500"
+            ],
             is_available: true,
             sizes: [
               { name: "Individual", price: 6500 },
@@ -579,6 +659,10 @@ class MockSupabaseClient {
             base_price: 5900,
             category: "Snacks / Sándwiches",
             image_url: "https://images.unsplash.com/photo-1568901346375-23c9450c58cd?w=500",
+            image_urls: [
+              "https://images.unsplash.com/photo-1568901346375-23c9450c58cd?w=500",
+              "https://images.unsplash.com/photo-1550547660-d9450f859349?w=500"
+            ],
             is_available: true,
             sizes: [],
             addons: [{ name: "Lámina de Queso Vegano", price: 800 }],
@@ -592,6 +676,7 @@ class MockSupabaseClient {
             base_price: 3900,
             category: "Entradas",
             image_url: "https://images.unsplash.com/photo-1544982503-9f984c14501a?w=500",
+            image_urls: ["https://images.unsplash.com/photo-1544982503-9f984c14501a?w=500"],
             is_available: true,
             created_at: new Date().toISOString(),
           },
@@ -603,6 +688,7 @@ class MockSupabaseClient {
             base_price: 4500,
             category: "Bebidas",
             image_url: "https://images.unsplash.com/photo-1595981267035-7b04ca84a82d?w=500",
+            image_urls: ["https://images.unsplash.com/photo-1595981267035-7b04ca84a82d?w=500"],
             is_available: true,
             created_at: new Date().toISOString(),
           },
@@ -896,6 +982,7 @@ class MockSupabaseClient {
     if (fnName === "admin_create_restaurant") {
       const newRestaurantId = "rest-" + Math.random().toString(36).substring(2, 9);
       const newUserId = "user-" + Math.random().toString(36).substring(2, 9);
+      const isTrialPlan = params.p_subscription_plan === "free_trial";
 
       // Create restaurant
       const updatedRestaurants = [
@@ -911,10 +998,17 @@ class MockSupabaseClient {
           city: params.p_city,
           address: params.p_address,
           subscription_plan: params.p_subscription_plan,
-          status: "active",
+          status: isTrialPlan ? "trial" : "active",
           is_active: true,
+          trial_ends_at: isTrialPlan 
+            ? new Date(Date.now() + 15 * 24 * 60 * 60 * 1000).toISOString()
+            : undefined,
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString(),
+          currency: "CLP",
+          usd_exchange_rate: 950,
+          default_language: "es",
+          default_prep_time: 15,
         },
       ];
       this.setStore("restaurants", updatedRestaurants);
@@ -977,6 +1071,7 @@ class MockSupabaseClient {
       }
 
       const newRestaurantId = "rest-" + Math.random().toString(36).substring(2, 9);
+      const isTrialPlan = params.p_plan === "free_trial";
       
       const updatedRequests = requests.map((r) => {
         if (r.id === params.p_request_id) {
@@ -1004,10 +1099,17 @@ class MockSupabaseClient {
           city: req.city,
           address: req.address,
           subscription_plan: params.p_plan,
-          status: "active",
+          status: isTrialPlan ? "trial" : "active",
           is_active: true,
+          trial_ends_at: isTrialPlan 
+            ? new Date(Date.now() + 15 * 24 * 60 * 60 * 1000).toISOString()
+            : undefined,
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString(),
+          currency: "CLP",
+          usd_exchange_rate: 950,
+          default_language: "es",
+          default_prep_time: 15,
         },
       ];
       this.setStore("restaurants", updatedRestaurants);

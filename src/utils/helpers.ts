@@ -67,14 +67,27 @@ export const clearStoredSession = (key: string): void => {
 export const getStoredUser = (): any | null => getStoredSession("user");
 export const getStoredAdmin = (): any | null => getStoredSession("admin");
 
-/**
- * Format currency value
- */
-export const formatCurrency = (amount: number | undefined | null): string => {
+export const formatCurrency = (
+  amount: number | undefined | null,
+  currency: string = "CLP",
+  exchangeRate: number = 950,
+  isConverted: boolean = false
+): string => {
   if (amount === undefined || amount === null || isNaN(amount)) {
-    return `${APP_CONFIG.defaultCurrency}0.00`;
+    return currency === "USD" ? "$0.00" : "$0";
   }
-  return `${APP_CONFIG.defaultCurrency}${amount.toFixed(2)}`;
+  
+  let finalAmount = amount;
+  if (currency === "USD" && !isConverted) {
+    finalAmount = amount / exchangeRate;
+  }
+  
+  if (currency === "USD") {
+    return `$${finalAmount.toFixed(2)}`;
+  } else {
+    // CLP: no decimals, dot separator
+    return `$${Math.round(finalAmount).toLocaleString("es-CL")}`;
+  }
 };
 
 /**
@@ -115,9 +128,9 @@ export const generateTempPassword = (): string => {
  * Calculate order totals
  */
 export const calculateOrderTotals = (items: any[]) => {
-  const subtotal = items.reduce((sum, item) => sum + item.item_total, 0);
-  const tax = subtotal * APP_CONFIG.taxRate;
-  const total = subtotal + tax;
+  const total = items.reduce((sum, item) => sum + item.item_total, 0);
+  const subtotal = total / 1.19;
+  const tax = total - subtotal;
 
   return { subtotal, tax, total };
 };

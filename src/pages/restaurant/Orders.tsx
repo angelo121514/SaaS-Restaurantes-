@@ -7,6 +7,10 @@ import {
   Phone,
   User,
   MessageSquare,
+  AlertTriangle,
+  Volume2,
+  VolumeX,
+  PlusCircle,
 } from "lucide-react";
 import {
   Card,
@@ -23,10 +27,132 @@ import {
 } from "../../services/restaurantService";
 import type { Order } from "../../config/supabase";
 import { formatDateTime, formatCurrency, playSound } from "../../utils/helpers";
-import { useRestaurantId } from "../../hooks/useAuth";
+import { useAuth } from "../../hooks/useAuth";
+
+// Componente de temporizador de cocina con cuenta regresiva y alarma
+interface OrderTimerProps {
+  order: Order;
+  defaultPrepMinutes: number;
+}
+
+const OrderTimer: React.FC<OrderTimerProps> = ({ order, defaultPrepMinutes }) => {
+  const [timeLeft, setTimeLeft] = useState<number>(0);
+  const [extraMinutes, setExtraMinutes] = useState<number>(0);
+  const [isMuted, setIsMuted] = useState<boolean>(false);
+  
+  const calculateRemainingSeconds = () => {
+    const startTimeStr = order.accepted_at || order.created_at;
+    const startTime = new Date(startTimeStr).getTime();
+    const durationMs = (defaultPrepMinutes + extraMinutes) * 60 * 1000;
+    const endTime = startTime + durationMs;
+    const diffSeconds = Math.ceil((endTime - Date.now()) / 1000);
+    return diffSeconds;
+  };
+  
+  useEffect(() => {
+    setTimeLeft(calculateRemainingSeconds());
+    
+    const interval = setInterval(() => {
+      const remaining = calculateRemainingSeconds();
+      setTimeLeft(remaining);
+      
+      // Si el tiempo es menor o igual a cero, hacer sonar alarma cada 10 segundos
+      if (remaining <= 0 && remaining % 10 === 0 && !isMuted) {
+        triggerBeepAlarm();
+      }
+    }, 1000);
+    
+    return () => clearInterval(interval);
+  }, [order.accepted_at, order.created_at, defaultPrepMinutes, extraMinutes, isMuted]);
+  
+  const triggerBeepAlarm = () => {
+    try {
+      const AudioContext = window.AudioContext || (window as any).webkitAudioContext;
+      if (!AudioContext) return;
+      const ctx = new AudioContext();
+      const playTone = (startOffset: number, duration: number, freq: number) => {
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = "sine";
+        osc.frequency.setValueAtTime(freq, ctx.currentTime + startOffset);
+        gain.gain.setValueAtTime(0.35, ctx.currentTime + startOffset);
+        gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + startOffset + duration);
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.start(ctx.currentTime + startOffset);
+        osc.stop(ctx.currentTime + startOffset + duration);
+      };
+      
+      // Tono triple agudo
+      playTone(0, 0.15, 880);
+      playTone(0.2, 0.15, 880);
+      playTone(0.4, 0.15, 880);
+    } catch (e) {
+      console.warn("Autoplay bloqueado por el navegador", e);
+    }
+  };
+  
+  const handleAddMinutes = () => {
+    setExtraMinutes(prev => prev + 5);
+  };
+  
+  const formatTimeLeft = (sec: number) => {
+    const isNegative = sec < 0;
+    const absSeconds = Math.abs(sec);
+    const m = Math.floor(absSeconds / 60);
+    const s = absSeconds % 60;
+    const formatted = `${m.toString().padStart(2, "0")}:${s.toString().padStart(2, "0")}`;
+    return isNegative ? `-${formatted}` : formatted;
+  };
+  
+  const isExpired = timeLeft <= 0;
+  
+  return (
+    <div className={`flex items-center gap-2 px-3 py-1.5 rounded-lg border transition-all duration-300 ${
+      isExpired 
+        ? "bg-red-500/10 border-red-500/30 text-red-500 animate-pulse" 
+        : "bg-bg-subtle border-border text-text"
+    }`}>
+      <div className="flex items-center gap-1.5 font-mono text-sm font-bold">
+        <Clock className={`w-4 h-4 ${isExpired ? "text-red-500 animate-spin" : "text-accent"}`} />
+        <span>{formatTimeLeft(timeLeft)}</span>
+      </div>
+      
+      {isExpired && (
+        <span title="¡Tiempo Excedido!">
+          <AlertTriangle className="w-4 h-4 text-red-500 animate-bounce" />
+        </span>
+      )}
+      
+      <div className="flex items-center gap-1 ml-auto">
+        <button
+          type="button"
+          onClick={handleAddMinutes}
+          className="p-1 hover:bg-bg rounded transition-colors text-success"
+          title="Agregar 5 minutos"
+        >
+          <PlusCircle className="w-4 h-4" />
+        </button>
+        <button
+          type="button"
+          onClick={() => setIsMuted(prev => !prev)}
+          className="p-1 hover:bg-bg rounded transition-colors text-text-secondary"
+          title={isMuted ? "Activar alarma" : "Silenciar alarma"}
+        >
+          {isMuted ? (
+            <VolumeX className="w-4 h-4 text-error" />
+          ) : (
+            <Volume2 className="w-4 h-4 text-accent-secondary" />
+          )}
+        </button>
+      </div>
+    </div>
+  );
+};
 
 const Orders: React.FC = () => {
-  const restaurantId = useRestaurantId();
+  const { restaurant } = useAuth();
+  const restaurantId = restaurant?.id || null;
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
@@ -230,6 +356,13 @@ const Orders: React.FC = () => {
                     {getStatusBadge(order.status)}
                   </div>
 
+                  {/* Temporizador de cocina en pedidos aceptados (En Cocina) */}
+                  {order.status === "accepted" && (
+                    <div className="mt-1 mb-2">
+                      <OrderTimer order={order} defaultPrepMinutes={restaurant?.default_prep_time || 15} />
+                    </div>
+                  )}
+
                   {/* Details */}
                   <div className="grid sm:grid-cols-2 gap-2 text-sm">
                     <div className="flex items-center space-x-2 text-text-secondary">
@@ -263,10 +396,36 @@ const Orders: React.FC = () => {
                       </span>
                       <span>•</span>
                       <span className="font-bold text-text text-lg">
-                        {formatCurrency(order.total)}
+                        {formatCurrency(order.total, restaurant?.currency || "CLP", restaurant?.usd_exchange_rate || 950)}
                       </span>
                     </div>
                   </div>
+
+                  {/* Desglose de Platos directamente en la tarjeta de Cocina o Pendientes */}
+                  {(order.status === "accepted" || order.status === "pending") && order.items && (
+                    <div className="mt-3 p-3 bg-bg-subtle rounded-xl space-y-2 border border-border">
+                      <p className="text-[10px] font-bold text-text-secondary uppercase tracking-wider mb-1">
+                        Platos del Pedido:
+                      </p>
+                      {order.items.map((item: any, idx: number) => (
+                        <div key={idx} className="flex items-start justify-between text-sm">
+                          <div className="flex-1">
+                            <span className="font-semibold text-text">{item.quantity}x {item.name}</span>
+                            {item.selected_size && (
+                              <span className="text-xs text-text-secondary ml-1.5">
+                                ({item.selected_size.name})
+                              </span>
+                            )}
+                            {item.selected_addons && item.selected_addons.length > 0 && (
+                              <p className="text-[11px] text-text-secondary leading-normal">
+                                + {item.selected_addons.map((a: any) => a.name).join(", ")}
+                              </p>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
 
                   {/* Customer Notes */}
                   {order.customer_notes && (
@@ -387,7 +546,7 @@ const Orders: React.FC = () => {
           <div className="space-y-4">
             <div className="bg-bg-subtle p-4 rounded-xl text-center space-y-1">
               <span className="text-xs text-text-secondary uppercase tracking-wider block font-bold">Monto Total a Cobrar</span>
-              <span className="text-2xl font-extrabold text-accent">{formatCurrency(selectedOrder.total)}</span>
+              <span className="text-2xl font-extrabold text-accent">{formatCurrency(selectedOrder.total, restaurant?.currency || "CLP", restaurant?.usd_exchange_rate || 950)}</span>
             </div>
 
             <div className="space-y-3">
@@ -457,6 +616,7 @@ const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({
   order,
   onClose,
 }) => {
+  const { restaurant } = useAuth();
   if (!order) return null;
 
   return (
@@ -531,7 +691,7 @@ const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({
                   )}
                 </div>
                 <p className="font-semibold text-text">
-                  {formatCurrency(item.item_total || item.subtotal || 0)}
+                  {formatCurrency(item.item_total || item.subtotal || 0, restaurant?.currency || "CLP", restaurant?.usd_exchange_rate || 950)}
                 </p>
               </div>
             ))}
@@ -542,21 +702,21 @@ const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({
         <div className="border-t border-border pt-4 space-y-2">
           <div className="flex justify-between text-text-secondary">
             <span>Subtotal</span>
-            <span>{formatCurrency(order.subtotal)}</span>
+            <span>{formatCurrency(order.subtotal, restaurant?.currency || "CLP", restaurant?.usd_exchange_rate || 950)}</span>
           </div>
           <div className="flex justify-between text-text-secondary">
             <span>IVA (19%)</span>
-            <span>{formatCurrency(order.tax)}</span>
+            <span>{formatCurrency(order.tax, restaurant?.currency || "CLP", restaurant?.usd_exchange_rate || 950)}</span>
           </div>
           {order.discount && order.discount > 0 && (
             <div className="flex justify-between text-success">
               <span>Descuento</span>
-              <span>-{formatCurrency(order.discount)}</span>
+              <span>-{formatCurrency(order.discount, restaurant?.currency || "CLP", restaurant?.usd_exchange_rate || 950)}</span>
             </div>
           )}
           <div className="flex justify-between text-lg font-bold text-text pt-2 border-t border-border">
             <span>Total</span>
-            <span>{formatCurrency(order.total)}</span>
+            <span>{formatCurrency(order.total, restaurant?.currency || "CLP", restaurant?.usd_exchange_rate || 950)}</span>
           </div>
         </div>
 

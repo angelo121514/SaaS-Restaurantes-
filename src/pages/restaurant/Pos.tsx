@@ -33,8 +33,8 @@ import {
   getCustomerOrders,
 } from "../../services/restaurantService";
 import type { MenuItem, Order, OrderItem, Customer } from "../../config/supabase";
-import { formatCurrency } from "../../utils/helpers";
-import { useRestaurantId } from "../../hooks/useAuth";
+import { formatCurrency as baseFormatCurrency } from "../../utils/helpers";
+import { useRestaurantId, useAuth } from "../../hooks/useAuth";
 import { APP_CONFIG } from "../../config/config";
 import { createPortal } from "react-dom";
 
@@ -89,6 +89,11 @@ const Pos: React.FC = () => {
   const [printTicketData, setPrintTicketData] = useState<any | null>(null);
 
   const restaurantId = useRestaurantId();
+  const { restaurant } = useAuth();
+
+  const formatCurrency = (amount: number | undefined | null) => {
+    return baseFormatCurrency(amount, restaurant?.currency, restaurant?.usd_exchange_rate);
+  };
 
   useEffect(() => {
     if (!restaurantId) return;
@@ -194,10 +199,10 @@ const Pos: React.FC = () => {
     return matchesSearch && matchesCategory;
   });
 
-  // Calculate pricing
-  const subtotal = cart.reduce((sum, item) => sum + item.itemTotal * item.quantity, 0);
-  const tax = subtotal * APP_CONFIG.taxRate;
-  const total = subtotal + tax;
+  // Calculate pricing (VAT inclusive)
+  const total = cart.reduce((sum, item) => sum + item.itemTotal * item.quantity, 0);
+  const subtotal = total / 1.19;
+  const tax = total - subtotal;
 
   // Add Item to Cart (Direct or triggers Modal)
   const handleItemClick = (item: MenuItem) => {
