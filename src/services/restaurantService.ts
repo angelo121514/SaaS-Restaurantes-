@@ -58,6 +58,7 @@ export const updateOrderStatus = async (
   if (paymentData) {
     updateData.payment_method = paymentData.paymentMethod;
     updateData.payment_transaction_id = paymentData.transactionId;
+    updateData.payment_status = "paid";
   }
 
   const { error } = await supabase

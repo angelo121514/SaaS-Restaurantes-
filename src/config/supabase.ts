@@ -248,6 +248,8 @@ class MockSupabaseClient {
     },
     signOut: async () => {
       localStorage.removeItem("mock_supabase_session");
+      localStorage.removeItem("user");
+      localStorage.removeItem("admin");
       return { error: null };
     },
     signInWithPassword: async (params: { email: string; password?: string }) => {
@@ -269,6 +271,15 @@ class MockSupabaseClient {
           access_token: "mock-admin-token",
         };
         localStorage.setItem("mock_supabase_session", JSON.stringify(mockSession));
+
+        const legacyAdminBlob = {
+          id: admin.id,
+          email: admin.email,
+          role: "admin",
+          __exp: Date.now() + 1000 * 60 * 60 * 8, // 8 hours
+        };
+        localStorage.setItem("admin", JSON.stringify(legacyAdminBlob));
+
         return { data: { user: mockSession.user, session: mockSession }, error: null };
       }
 
@@ -288,6 +299,23 @@ class MockSupabaseClient {
           access_token: "mock-user-token",
         };
         localStorage.setItem("mock_supabase_session", JSON.stringify(mockSession));
+
+        const restaurantStore = JSON.parse(localStorage.getItem("mock_db_restaurants") || "[]");
+        const restaurant = restaurantStore.find((r: any) => r.id === dbUser.restaurant_id);
+        const legacyUserBlob = {
+          id: dbUser.id,
+          email: dbUser.email,
+          role: dbUser.role || "owner",
+          restaurant_id: dbUser.restaurant_id || null,
+          restaurant: restaurant ? {
+            name: restaurant.name,
+            slug: restaurant.slug,
+            is_active: restaurant.is_active,
+          } : null,
+          __exp: Date.now() + 1000 * 60 * 60 * 8, // 8 hours
+        };
+        localStorage.setItem("user", JSON.stringify(legacyUserBlob));
+
         return { data: { user: mockSession.user, session: mockSession }, error: null };
       }
 
@@ -341,7 +369,74 @@ class MockSupabaseClient {
       };
       
       localStorage.setItem("mock_supabase_session", JSON.stringify(mockSession));
+
+      const key = (metadata.role || "owner") === "admin" ? "admin" : "user";
+      const restaurantStore = JSON.parse(localStorage.getItem("mock_db_restaurants") || "[]");
+      const restaurant = restaurantStore.find((r: any) => r.id === metadata.restaurant_id);
+      const legacyUserBlob = {
+        id: newUserId,
+        email: email,
+        role: metadata.role || "owner",
+        restaurant_id: metadata.restaurant_id || null,
+        restaurant: restaurant ? {
+          name: restaurant.name,
+          slug: restaurant.slug,
+          is_active: restaurant.is_active,
+        } : null,
+        __exp: Date.now() + 1000 * 60 * 60 * 8, // 8 hours
+      };
+      localStorage.setItem(key, JSON.stringify(legacyUserBlob));
+
       return { data: { user: mockSession.user, session: mockSession }, error: null };
+    },
+    updateUser: async (attributes: { password?: string; data?: any }) => {
+      console.log("Mock updateUser called with:", attributes);
+      const sessionStr = localStorage.getItem("mock_supabase_session");
+      if (!sessionStr) {
+        return { data: { user: null }, error: { message: "No active session in mock mode" } };
+      }
+      const session = JSON.parse(sessionStr);
+      const userId = session.user?.id;
+      const userEmail = session.user?.email;
+
+      if (attributes.password) {
+        const usersStore = JSON.parse(localStorage.getItem("mock_db_users") || "[]");
+        const adminUsersStore = JSON.parse(localStorage.getItem("mock_db_admin_users") || "[]");
+        
+        let userUpdated = false;
+        const updatedUsers = usersStore.map((u: any) => {
+          if (u.id === userId || u.email.toLowerCase() === userEmail?.toLowerCase()) {
+            userUpdated = true;
+            return { ...u, password_hash: attributes.password };
+          }
+          return u;
+        });
+
+        const updatedAdminUsers = adminUsersStore.map((au: any) => {
+          if (au.id === userId || au.email.toLowerCase() === userEmail?.toLowerCase()) {
+            userUpdated = true;
+            return { ...au, password: attributes.password };
+          }
+          return au;
+        });
+
+        if (userUpdated) {
+          localStorage.setItem("mock_db_users", JSON.stringify(updatedUsers));
+          localStorage.setItem("mock_db_admin_users", JSON.stringify(updatedAdminUsers));
+        } else {
+          return { data: { user: null }, error: { message: "User not found in mock store to update password" } };
+        }
+      }
+
+      if (attributes.data) {
+        session.user.user_metadata = {
+          ...session.user.user_metadata,
+          ...attributes.data,
+        };
+        localStorage.setItem("mock_supabase_session", JSON.stringify(session));
+      }
+
+      return { data: { user: session.user }, error: null };
     },
   };
 

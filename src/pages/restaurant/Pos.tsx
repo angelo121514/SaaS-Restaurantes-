@@ -804,7 +804,7 @@ const Pos: React.FC = () => {
               className="text-xs bg-red-600 hover:bg-red-750 text-white flex items-center justify-center gap-1 border-0 px-2 py-2.5 shadow-md shadow-red-500/10 active:scale-95"
             >
               <CheckCircle className="w-3.5 h-3.5" />
-              <span>Directo / Caja</span>
+              <span>Pagar</span>
             </Button>
           </div>
         </div>

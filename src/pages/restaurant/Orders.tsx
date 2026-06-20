@@ -32,6 +32,10 @@ const Orders: React.FC = () => {
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [showDetailsModal, setShowDetailsModal] = useState(false);
   const [showRejectModal, setShowRejectModal] = useState(false);
+  const [showPaymentModal, setShowPaymentModal] = useState(false);
+  const [paymentMethod, setPaymentMethod] = useState<"cash" | "card" | "transfer">("cash");
+  const [transactionId, setTransactionId] = useState("");
+  const [paymentSubmitting, setPaymentSubmitting] = useState(false);
   const [statusFilter, setStatusFilter] = useState<string>("pending");
   // IDs de pedidos ya vistos (evita el stale closure sobre `orders`).
   const seenOrderIdsRef = useRef<Set<string>>(new Set());
@@ -77,6 +81,22 @@ const Orders: React.FC = () => {
     const success = await updateOrderStatus(orderId, newStatus);
     if (!success) {
       alert("Error al actualizar el estado del pedido");
+    }
+  };
+
+  const handleConfirmPayment = async () => {
+    if (!selectedOrder) return;
+    setPaymentSubmitting(true);
+    const success = await updateOrderStatus(selectedOrder.id, "completed", {
+      paymentMethod,
+      transactionId: transactionId.trim() || undefined,
+    });
+    setPaymentSubmitting(false);
+    if (success) {
+      setShowPaymentModal(false);
+      setSelectedOrder(null);
+    } else {
+      alert("Error al registrar el pago");
     }
   };
 
@@ -303,11 +323,14 @@ const Orders: React.FC = () => {
                         variant="secondary"
                         size="sm"
                         fullWidth
-                        onClick={() =>
-                          handleStatusUpdate(order.id, "completed")
-                        }
+                        onClick={() => {
+                          setSelectedOrder(order);
+                          setPaymentMethod((order.payment_method as any) || "cash");
+                          setTransactionId(order.payment_transaction_id || "");
+                          setShowPaymentModal(true);
+                        }}
                       >
-                        Marcar Completado
+                        Pagar
                       </Button>
                       <Button
                         variant="outline"
@@ -349,6 +372,75 @@ const Orders: React.FC = () => {
         }}
         onReject={handleStatusUpdate}
       />
+
+      {/* Payment Modal */}
+      {showPaymentModal && selectedOrder && (
+        <Modal
+          isOpen={showPaymentModal}
+          onClose={() => {
+            setShowPaymentModal(false);
+            setSelectedOrder(null);
+          }}
+          title={`Procesar Pago - Pedido #${selectedOrder.order_number}`}
+          size="md"
+        >
+          <div className="space-y-4">
+            <div className="bg-bg-subtle p-4 rounded-xl text-center space-y-1">
+              <span className="text-xs text-text-secondary uppercase tracking-wider block font-bold">Monto Total a Cobrar</span>
+              <span className="text-2xl font-extrabold text-accent">{formatCurrency(selectedOrder.total)}</span>
+            </div>
+
+            <div className="space-y-3">
+              <div>
+                <label className="block text-xs font-bold text-text-secondary uppercase tracking-wider mb-1">Medio de Pago</label>
+                <select
+                  value={paymentMethod}
+                  onChange={(e) => setPaymentMethod(e.target.value as any)}
+                  className="w-full bg-bg border border-border rounded-lg px-2.5 py-1.5 font-bold text-text focus:outline-none focus:ring-1 focus:ring-accent"
+                >
+                  <option value="cash">💵 Efectivo</option>
+                  <option value="card">💳 Tarjeta (POS)</option>
+                  <option value="transfer">🏦 Transferencia</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-text-secondary uppercase tracking-wider mb-1">ID de Transacción (Opcional)</label>
+                <input
+                  type="text"
+                  placeholder="Ej: Nro de voucher, transferencia, etc."
+                  value={transactionId}
+                  onChange={(e) => setTransactionId(e.target.value)}
+                  className="w-full bg-bg border border-border rounded-lg px-2.5 py-1.5 text-xs text-text placeholder:text-text-secondary focus:outline-none focus:ring-1 focus:ring-accent"
+                />
+              </div>
+            </div>
+
+            <div className="flex gap-2 pt-2">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => {
+                  setShowPaymentModal(false);
+                  setSelectedOrder(null);
+                }}
+                fullWidth
+              >
+                Cancelar
+              </Button>
+              <Button
+                type="button"
+                loading={paymentSubmitting}
+                onClick={handleConfirmPayment}
+                className="bg-red-650 hover:bg-red-750 text-white font-bold border-0"
+                fullWidth
+              >
+                Confirmar Pago
+              </Button>
+            </div>
+          </div>
+        </Modal>
+      )}
     </div>
   );
 };
