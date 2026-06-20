@@ -14,7 +14,7 @@ const getTrialDaysLeft = (endsAt: string | null | undefined): number => {
 };
 
 const RestaurantSettings: React.FC = () => {
-  const { profile, refresh } = useAuth();
+  const { profile, refresh, loading: authLoading } = useAuth();
   const restaurantId = useRestaurantId();
   const [restaurant, setRestaurant] = useState<Restaurant | null>(null);
   const [loading, setLoading] = useState(true);
@@ -105,8 +105,11 @@ const RestaurantSettings: React.FC = () => {
   };
 
   useEffect(() => {
+    if (authLoading) return;
+
     const fetchRestaurant = async () => {
       try {
+        setError("");
         if (profile?.role === "admin") {
           setLoading(false);
           return;
@@ -126,15 +129,15 @@ const RestaurantSettings: React.FC = () => {
 
         if (fetchError) throw fetchError;
         setRestaurant(data);
-      } catch (err) {
-        setError("Error al cargar los detalles del restaurante");
+      } catch (err: any) {
+        setError(err.message || "Error al cargar los detalles del restaurante");
       } finally {
         setLoading(false);
       }
     };
 
     fetchRestaurant();
-  }, [restaurantId, profile]);
+  }, [restaurantId, profile, authLoading]);
 
   useEffect(() => {
     if (restaurant) {

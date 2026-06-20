@@ -81,6 +81,10 @@ const RestaurantDashboard: React.FC = () => {
   // Settings is always last
   navItems.push({ path: "/restaurant/settings", icon: Settings, label: "Configuración" });
 
+  const isTrialExpired = restaurant?.subscription_plan === "free_trial" && 
+    restaurant?.trial_ends_at && 
+    getTrialDaysLeft(restaurant.trial_ends_at) === 0;
+
   return (
     <div className="min-h-screen bg-bg-subtle transition-colors duration-200">
       {/* Top Navigation */}
@@ -130,6 +134,19 @@ const RestaurantDashboard: React.FC = () => {
           </div>
         </div>
       </nav>
+
+      {/* Warning Banner for Expired Trial */}
+      {isTrialExpired && (
+        <div className="bg-red-650 text-white text-center py-2.5 px-4 text-xs sm:text-sm font-semibold flex items-center justify-center gap-1 transition-all">
+          <span>⚠️ Tu período de prueba de 15 días ha expirado. El POS de ventas y el Menú digital se encuentran bloqueados.</span>
+          <Link
+            to="/restaurant/settings"
+            className="underline hover:text-red-100 font-bold ml-1 transition-all"
+          >
+            Contratar Plan Ahora
+          </Link>
+        </div>
+      )}
 
       {/* Secondary Navigation */}
       <div className="bg-bg border-b border-border transition-colors duration-200">

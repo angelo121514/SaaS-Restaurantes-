@@ -889,6 +889,22 @@ class MockSupabaseClient {
       },
 
       insert: (rows: any[]) => {
+        if (table === "menu_items") {
+          const restaurants = this.getStore("restaurants");
+          for (const row of rows) {
+            const restId = row.restaurant_id;
+            const restaurant = restaurants.find((r: any) => r.id === restId);
+            if (restaurant && restaurant.subscription_plan === "free_trial") {
+              const currentCount = store.filter((item: any) => item.restaurant_id === restId).length;
+              if (currentCount + rows.length > 30) {
+                query.error = { message: "Límite de platos excedido. El plan de prueba gratuito está limitado a un máximo de 30 platos. Por favor, actualiza tu plan en Configuración para agregar más platos." };
+                query.data = [];
+                return query;
+              }
+            }
+          }
+        }
+
         const newRows = rows.map((row) => ({
           id: Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15),
           created_at: new Date().toISOString(),

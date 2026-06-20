@@ -8,6 +8,7 @@ import {
   Search,
   CheckCircle,
   Package,
+  Hourglass,
 } from "lucide-react";
 import {
   Card,
@@ -436,6 +437,33 @@ const CustomerMenu: React.FC = () => {
           </h2>
           <p className="text-text-secondary">
             {t("notFoundDesc")}
+          </p>
+        </Card>
+      </div>
+    );
+  }
+
+  const getTrialDaysLeft = (endsAt?: string | null) => {
+    if (!endsAt) return 0;
+    const diff = new Date(endsAt).getTime() - Date.now();
+    const days = Math.ceil(diff / (1000 * 60 * 60 * 24));
+    return days > 0 ? days : 0;
+  };
+
+  const isTrialExpired = restaurant.subscription_plan === "free_trial" && 
+    restaurant.trial_ends_at && 
+    getTrialDaysLeft(restaurant.trial_ends_at) === 0;
+
+  if (isTrialExpired) {
+    return (
+      <div className="min-h-screen bg-bg-subtle flex items-center justify-center p-4">
+        <Card className="text-center p-8 flex flex-col items-center max-w-md">
+          <Hourglass className="w-16 h-16 text-amber-500 mx-auto mb-4 animate-pulse" />
+          <h2 className="text-2xl font-bold text-text mb-2">
+            Servicio Suspendido Temporalmente
+          </h2>
+          <p className="text-text-secondary">
+            El menú digital de este local no está disponible en este momento debido a un mantenimiento administrativo de su plan. Por favor, contacta directamente con el restaurante si necesitas realizar un pedido.
           </p>
         </Card>
       </div>

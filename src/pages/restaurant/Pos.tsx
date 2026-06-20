@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import {
   Search,
   ShoppingCart,
@@ -14,6 +15,7 @@ import {
   ArrowRightLeft,
   CheckCircle,
   HelpCircle,
+  Hourglass,
 } from "lucide-react";
 import {
   Card,
@@ -49,6 +51,7 @@ interface CartItem {
 }
 
 const Pos: React.FC = () => {
+  const navigate = useNavigate();
   const [menuItems, setMenuItems] = useState<MenuItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
@@ -386,6 +389,39 @@ const Pos: React.FC = () => {
     setCart([]);
     setOrderError("");
   };
+
+  const getTrialDaysLeft = (endsAt?: string | null) => {
+    if (!endsAt) return 0;
+    const diff = new Date(endsAt).getTime() - Date.now();
+    const days = Math.ceil(diff / (1000 * 60 * 60 * 24));
+    return days > 0 ? days : 0;
+  };
+
+  const isTrialExpired = restaurant?.subscription_plan === "free_trial" && 
+    restaurant?.trial_ends_at && 
+    getTrialDaysLeft(restaurant.trial_ends_at) === 0;
+
+  if (isTrialExpired) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px] w-full">
+        <Card className="text-center p-8 flex flex-col items-center justify-center max-w-lg mx-auto">
+          <Hourglass className="w-16 h-16 text-error mx-auto mb-4 animate-pulse" />
+          <h2 className="text-2xl font-bold text-text mb-3">
+            Período de Prueba Expirado
+          </h2>
+          <p className="text-text-secondary mb-6 text-sm">
+            Tu período de prueba gratuito de 15 días ha expirado. Para continuar registrando ventas en el POS y recibir pedidos en tu menú digital de clientes, por favor contrata un plan en la sección de Configuración.
+          </p>
+          <Button
+            onClick={() => navigate("/restaurant/settings")}
+            className="bg-accent hover:bg-accent-secondary text-white font-bold"
+          >
+            Ir a Configuración de Planes
+          </Button>
+        </Card>
+      </div>
+    );
+  }
 
   if (loading) {
     return <Loading text="Cargando menú de caja..." />;
