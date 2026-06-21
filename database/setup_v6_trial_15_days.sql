@@ -192,5 +192,16 @@ SET trial_ends_at = created_at + interval '15 days'
 WHERE subscription_plan = 'free_trial' 
   AND trial_ends_at IS NOT NULL;
 
--- 7. Forzar recarga del caché de esquema en PostgREST
+-- 7. Corregir políticas RLS en la tabla restaurants para permitir que los usuarios públicos vean los restaurantes en prueba (trial)
+DROP POLICY IF EXISTS "Public can view active restaurants" ON public.restaurants;
+DROP POLICY IF EXISTS "Restaurant owners can view their restaurant" ON public.restaurants;
+DROP POLICY IF EXISTS restaurants_owner_select ON public.restaurants;
+
+CREATE POLICY restaurants_owner_select ON public.restaurants
+  FOR SELECT USING (
+    public.is_my_restaurant(id)
+    OR (is_active = TRUE AND status IN ('active', 'trial'))
+  );
+
+-- 8. Forzar recarga del caché de esquema en PostgREST
 NOTIFY pgrst, 'reload schema';
