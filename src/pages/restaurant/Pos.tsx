@@ -30,6 +30,7 @@ import {
 import {
   subscribeToMenuItems,
   createOrder,
+  updateOrder,
   getCustomers,
   createCustomer,
   getCustomerOrders,
@@ -77,6 +78,7 @@ const Pos: React.FC = () => {
   // UI state
   const [orderSubmitting, setOrderSubmitting] = useState(false);
   const [orderSuccess, setOrderSuccess] = useState(false);
+  const [successMessage, setSuccessMessage] = useState("¡Pedido registrado exitosamente!");
   const [orderError, setOrderError] = useState("");
 
   // Customer & CRM State
@@ -87,6 +89,7 @@ const Pos: React.FC = () => {
   const [customerSearchQuery, setCustomerSearchQuery] = useState("");
   const [customerOrders, setCustomerOrders] = useState<Order[]>([]);
   const [customerFavorites, setCustomerFavorites] = useState<string[]>([]);
+  const [currentOrderId, setCurrentOrderId] = useState<string | null>(null);
   
   // Print Ticket State
   const [printTicketData, setPrintTicketData] = useState<any | null>(null);
@@ -353,41 +356,65 @@ const Pos: React.FC = () => {
       total,
       status: finalStatus,
       payment_method: paymentMethod,
-      payment_status: paymentStatus,
+      payment_status: finalStatus === "completed" ? "paid" : "pending",
       customer_notes: customerNotes.trim() || undefined,
       internal_notes: "Pedido registrado desde Caja POS",
     };
 
-    const { data: createdOrder, error } = await createOrder(orderData);
+    let result;
+    if (currentOrderId) {
+      // Update existing order (already sent to kitchen)
+      result = await updateOrder(currentOrderId, orderData);
+    } else {
+      // Create new order
+      result = await createOrder(orderData);
+    }
+
     setOrderSubmitting(false);
 
-    if (!error) {
-      setOrderSuccess(true);
-      if (createdOrder && finalStatus === "completed") {
-        setPrintTicketData(createdOrder);
-      }
-      setCart([]);
-      setCustomerName("");
-      setCustomerPhone("");
-      setCustomerNotes("");
-      setTableNumber("");
-      setPaymentMethod("cash");
-      setPaymentStatus("paid");
-      setSelectedCustomer(null);
-      setCustomerSearchQuery("");
-      loadCustomers();
+    if (!result.error) {
+      const savedOrder = result.data;
+      if (finalStatus === "completed") {
+        setSuccessMessage("¡Pedido completado y pagado exitosamente!");
+        setOrderSuccess(true);
+        if (savedOrder) {
+          setPrintTicketData(savedOrder);
+        }
+        setCart([]);
+        setCustomerName("");
+        setCustomerPhone("");
+        setCustomerNotes("");
+        setTableNumber("");
+        setPaymentMethod("cash");
+        setPaymentStatus("paid");
+        setSelectedCustomer(null);
+        setCustomerSearchQuery("");
+        setCurrentOrderId(null);
+        loadCustomers();
 
-      setTimeout(() => {
-        setOrderSuccess(false);
-      }, 3000);
+        setTimeout(() => {
+          setOrderSuccess(false);
+        }, 3000);
+      } else {
+        // "A Cocina" - keep cart, save order ID, show success badge
+        setSuccessMessage("¡Pedido enviado a cocina exitosamente!");
+        setOrderSuccess(true);
+        if (savedOrder) {
+          setCurrentOrderId(savedOrder.id);
+        }
+        setTimeout(() => {
+          setOrderSuccess(false);
+        }, 3000);
+      }
     } else {
-      setOrderError(error.message || "Ocurrió un error al registrar el pedido");
+      setOrderError(result.error.message || "Ocurrió un error al procesar el pedido");
     }
   };
 
   const clearCart = () => {
     setCart([]);
     setOrderError("");
+    setCurrentOrderId(null);
   };
 
   const getTrialDaysLeft = (endsAt?: string | null) => {
@@ -532,8 +559,16 @@ const Pos: React.FC = () => {
           {orderSuccess && (
             <Alert
               type="success"
-              message="¡Pedido registrado exitosamente!"
+              message={successMessage}
               className="bg-emerald-50 border-emerald-250 text-emerald-800"
+            />
+          )}
+
+          {currentOrderId && (
+            <Alert
+              type="info"
+              message="Pedido enviado a cocina. Pulsa 'Pagar' para completar y cerrar."
+              className="bg-blue-50 border-blue-200 text-blue-800"
             />
           )}
 

@@ -5,6 +5,8 @@ import { QRCodeSVG } from "qrcode.react";
 import { supabase } from "../../config/supabase";
 import type { Restaurant } from "../../config/supabase";
 import { useAuth, useRestaurantId } from "../../hooks/useAuth";
+import { APP_CONFIG } from "../../config/config";
+import { useNavigate } from "react-router-dom";
 
 const getTrialDaysLeft = (endsAt: string | null | undefined): number => {
   if (!endsAt) return 0;
@@ -14,7 +16,8 @@ const getTrialDaysLeft = (endsAt: string | null | undefined): number => {
 };
 
 const RestaurantSettings: React.FC = () => {
-  const { profile, refresh, loading: authLoading } = useAuth();
+  const { user, profile, refresh, loading: authLoading } = useAuth();
+  const navigate = useNavigate();
   const restaurantId = useRestaurantId();
   const [restaurant, setRestaurant] = useState<Restaurant | null>(null);
   const [loading, setLoading] = useState(true);
@@ -22,10 +25,6 @@ const RestaurantSettings: React.FC = () => {
   const [copiedId, setCopiedId] = useState(false);
 
   // Password state
-  const [passwordData, setPasswordData] = useState({
-    newPassword: "",
-    confirmPassword: "",
-  });
   const [passwordStatus, setPasswordStatus] = useState<{ type: "success" | "error"; message: string } | null>(null);
   const [passwordLoading, setPasswordLoading] = useState(false);
 
@@ -41,6 +40,7 @@ const RestaurantSettings: React.FC = () => {
 
   // Billing state
   const [selectedPlan, setSelectedPlan] = useState<string | null>(null);
+  const [billingPeriod, setBillingPeriod] = useState<"monthly" | "annual">("monthly");
   const [paymentData, setPaymentData] = useState({
     cardNumber: "",
     cardName: "",
@@ -61,43 +61,53 @@ const RestaurantSettings: React.FC = () => {
     }
   };
 
-  const handlePasswordChange = async (e: React.FormEvent) => {
+  const handleRequestPasswordReset = async (e: React.FormEvent) => {
     e.preventDefault();
     setPasswordStatus(null);
-
-    if (passwordData.newPassword !== passwordData.confirmPassword) {
-      setPasswordStatus({
-        type: "error",
-        message: "Las contraseñas nuevas no coinciden",
-      });
-      return;
-    }
-
     setPasswordLoading(true);
-    try {
-      const { error: updateError } = await supabase.auth.updateUser({
-        password: passwordData.newPassword,
-      });
 
-      if (updateError) {
+    try {
+      const userEmail = user?.email;
+      if (!userEmail) {
         setPasswordStatus({
           type: "error",
-          message: updateError.message || "Error al actualizar la contraseña",
+          message: "No se encontró el correo electrónico registrado.",
         });
+        setPasswordLoading(false);
+        return;
+      }
+
+      // Detectar si estamos en producción (auth real) o desarrollo (mock)
+      const isRealAuth = typeof (supabase as any).auth?.onAuthStateChange === "function";
+      if (isRealAuth) {
+        const { error: resetError } = await supabase.auth.resetPasswordForEmail(userEmail, {
+          redirectTo: window.location.origin + "/setup-password",
+        });
+
+        if (resetError) {
+          setPasswordStatus({
+            type: "error",
+            message: resetError.message || "Error al enviar el correo de validación.",
+          });
+        } else {
+          setPasswordStatus({
+            type: "success",
+            message: `¡Enlace de validación enviado! Hemos enviado un correo a ${userEmail} para completar el cambio de contraseña.`,
+          });
+        }
       } else {
         setPasswordStatus({
           type: "success",
-          message: "¡Contraseña actualizada exitosamente!",
+          message: "Modo demo: Redirigiendo para definir tu nueva contraseña...",
         });
-        setPasswordData({
-          newPassword: "",
-          confirmPassword: "",
-        });
+        setTimeout(() => {
+          navigate("/setup-password");
+        }, 1500);
       }
     } catch (err: any) {
       setPasswordStatus({
         type: "error",
-        message: err.message || "Ocurrió un error inesperado",
+        message: err.message || "Ocurrió un error inesperado.",
       });
     } finally {
       setPasswordLoading(false);
@@ -426,33 +436,18 @@ const RestaurantSettings: React.FC = () => {
           />
         )}
 
-        <form onSubmit={handlePasswordChange} className="space-y-4 max-w-md">
-          <Input
-            label="Nueva Contraseña"
-            type="password"
-            placeholder="Mínimo 6 caracteres"
-            value={passwordData.newPassword}
-            onChange={(e) => setPasswordData({ ...passwordData, newPassword: e.target.value })}
-            required
-            minLength={6}
-          />
-
-          <Input
-            label="Confirmar Nueva Contraseña"
-            type="password"
-            placeholder="Repite la nueva contraseña"
-            value={passwordData.confirmPassword}
-            onChange={(e) => setPasswordData({ ...passwordData, confirmPassword: e.target.value })}
-            required
-            minLength={6}
-          />
+        <form onSubmit={handleRequestPasswordReset} className="space-y-4 max-w-md">
+          <div className="p-3.5 bg-bg-subtle border border-border rounded-xl text-sm text-text-secondary">
+            <span className="font-semibold text-text">Correo de la cuenta:</span>{" "}
+            <span className="font-mono text-xs">{user?.email || "Cargando..."}</span>
+          </div>
 
           <Button
             type="submit"
             loading={passwordLoading}
             className="bg-red-650 hover:bg-red-750 text-white font-bold border-0 shadow-lg shadow-red-900/20 active:scale-[0.98]"
           >
-            Actualizar Contraseña
+            Enviar Enlace de Validación al Correo
           </Button>
         </form>
       </Card>
@@ -474,7 +469,7 @@ const RestaurantSettings: React.FC = () => {
               Enviar Email a Soporte
             </Button>
           </a>
-          <a href="https://wa.me/56987654321" target="_blank" rel="noopener noreferrer" className="block w-full">
+          <a href="https://wa.me/56926942853" target="_blank" rel="noopener noreferrer" className="block w-full">
             <Button variant="secondary" fullWidth>
               WhatsApp Soporte (24/7)
             </Button>
@@ -630,68 +625,94 @@ const RestaurantSettings: React.FC = () => {
 
           {/* Selector de Planes de Pago */}
           <div className="space-y-4">
-            <h4 className="font-semibold text-text text-md">Planes de Suscripción Disponibles:</h4>
-            <div className="grid md:grid-cols-3 gap-4">
-              {[
-                {
-                  key: "starter",
-                  name: "Básico (Starter)",
-                  priceCLP: "$19.990 / mes",
-                  priceUSD: "$25.00 / mes",
-                  features: ["Pedidos ilimitados", "Menú básico", "POS + Código QR", "Soporte por correo"],
-                },
-                {
-                  key: "pro",
-                  name: "Pro",
-                  priceCLP: "$39.990 / mes",
-                  priceUSD: "$49.00 / mes",
-                  features: ["Todo del Starter", "CRM de Clientes", "Recomendaciones con IA", "Soporte Premium 24/7"],
-                },
-                {
-                  key: "enterprise",
-                  name: "Enterprise",
-                  priceCLP: "$79.990 / mes",
-                  priceUSD: "$99.00 / mes",
-                  features: ["Todo del Pro", "Multi-sucursal", "Facturación integrada", "SLA garantizado"],
-                },
-              ].map((p) => {
-                const isSelected = selectedPlan === p.key;
-                const isCurrent = restaurant.subscription_plan === p.key;
-                return (
-                  <div
-                    key={p.key}
-                    onClick={() => !isCurrent && setSelectedPlan(p.key)}
-                    className={`border-2 rounded-xl p-4 flex flex-col justify-between cursor-pointer transition-all duration-200 ${
-                      isCurrent
-                        ? "border-success bg-success/5 cursor-default"
-                        : isSelected
-                        ? "border-accent bg-accent/5 shadow-md shadow-accent/5"
-                        : "border-border hover:border-accent/40"
-                    }`}
-                  >
-                    <div>
-                      <div className="flex items-center justify-between mb-2">
-                        <span className="font-bold text-text">{p.name}</span>
-                        {isCurrent && (
-                          <span className="text-[10px] bg-success text-white px-2 py-0.5 rounded-full font-bold">
-                            Activo
-                          </span>
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <h4 className="font-semibold text-text text-md">Planes de Suscripción Disponibles:</h4>
+              
+              {/* Toggle Mensual/Anual */}
+              <div className="flex items-center gap-3 bg-bg-subtle p-1.5 rounded-lg border border-border">
+                <span className={`text-xs font-semibold px-2 py-1 rounded transition-colors ${billingPeriod === "monthly" ? "bg-red-500 text-white" : "text-text-secondary"}`}>
+                  Mensual
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setBillingPeriod(billingPeriod === "monthly" ? "annual" : "monthly")}
+                  className="relative w-10 h-6 bg-zinc-800 border border-border rounded-full p-1 flex items-center transition-colors"
+                  aria-label="Alternar facturación"
+                >
+                  <div className={`w-4 h-4 rounded-full transition-all duration-300 transform ${billingPeriod === "annual" ? "translate-x-4 bg-amber-500" : "translate-x-0 bg-red-500"}`} />
+                </button>
+                <span className={`text-xs font-semibold px-2 py-1 rounded flex items-center gap-1 transition-colors ${billingPeriod === "annual" ? "bg-amber-500/10 text-amber-500" : "text-text-secondary"}`}>
+                  Anual
+                  <span className="text-[10px] bg-amber-500/20 text-amber-500 px-1 py-0.5 rounded font-black">
+                    -15%
+                  </span>
+                </span>
+              </div>
+            </div>
+
+            <div className="grid md:grid-cols-2 gap-4">
+              {Object.entries(APP_CONFIG.plans)
+                .filter(([key]) => key !== "free_trial")
+                .map(([key, p]) => {
+                  const isSelected = selectedPlan === key;
+                  const isCurrent = restaurant.subscription_plan === key;
+                  
+                  // Calcular precios dinámicos según el periodo seleccionado
+                  let displayPriceCLP = p.price;
+                  let displayPriceUSD = (p as any).price_usd || 0;
+                  let billingLabel = " / mes";
+                  let yearlyTotalLabel = "";
+
+                  if (billingPeriod === "annual") {
+                    displayPriceCLP = Math.round(p.price_annual / 12);
+                    displayPriceUSD = ((p as any).price_annual_usd || 0) / 12;
+                    billingLabel = " / mes (eq.)";
+                    yearlyTotalLabel = `Facturado anualmente: $${p.price_annual.toLocaleString("es-CL")} / año`;
+                  }
+
+                  const priceCLP = `$${displayPriceCLP.toLocaleString("es-CL")}${billingLabel}`;
+                  const priceUSD = `$${displayPriceUSD.toFixed(2)}${billingLabel}`;
+
+                  return (
+                    <div
+                      key={key}
+                      onClick={() => !isCurrent && setSelectedPlan(key)}
+                      className={`border-2 rounded-xl p-4 flex flex-col justify-between cursor-pointer transition-all duration-200 ${
+                        isCurrent
+                          ? "border-success bg-success/5 cursor-default"
+                          : isSelected
+                          ? "border-accent bg-accent/5 shadow-md shadow-accent/5"
+                          : "border-border hover:border-accent/40"
+                      }`}
+                    >
+                      <div>
+                        <div className="flex items-center justify-between mb-2">
+                          <span className="font-bold text-text">{p.name}</span>
+                          {isCurrent && (
+                            <span className="text-[10px] bg-success text-white px-2 py-0.5 rounded-full font-bold">
+                              Activo
+                            </span>
+                          )}
+                        </div>
+                        <div className="text-xl font-extrabold text-accent">
+                          {configData.currency === "USD" ? priceUSD : priceCLP}
+                        </div>
+                        {yearlyTotalLabel && (
+                          <div className="text-[10px] text-amber-500 font-semibold mt-1">
+                            {yearlyTotalLabel}
+                          </div>
                         )}
+                        <ul className="space-y-1.5 text-xs text-text-secondary mt-3">
+                          {p.features.map((f, i) => (
+                            <li key={i} className="flex items-center gap-1">
+                              ✓ {f}
+                            </li>
+                          ))}
+                        </ul>
                       </div>
-                      <div className="text-xl font-extrabold text-accent mb-3">
-                        {configData.currency === "USD" ? p.priceUSD : p.priceCLP}
-                      </div>
-                      <ul className="space-y-1.5 text-xs text-text-secondary">
-                        {p.features.map((f, i) => (
-                          <li key={i} className="flex items-center gap-1">
-                            ✓ {f}
-                          </li>
-                        ))}
-                      </ul>
                     </div>
-                  </div>
-                );
-              })}
+                  );
+                })}
             </div>
 
             {/* Formulario de Pago Simulado si hay un plan seleccionado */}

@@ -115,7 +115,11 @@ export const createMenuItem = async (item: Partial<MenuItem>) => {
     .select()
     .single();
 
-  return !error;
+  if (error) {
+    console.error("Error creating menu item:", error);
+    return { success: false, error: error.message };
+  }
+  return { success: true };
 };
 
 // Update menu item
@@ -128,7 +132,11 @@ export const updateMenuItem = async (
     .update(updates)
     .eq("id", itemId);
 
-  return !error;
+  if (error) {
+    console.error("Error updating menu item:", error);
+    return { success: false, error: error.message };
+  }
+  return { success: true };
 };
 
 // Toggle menu item availability (triggers real-time update for customers)
@@ -156,6 +164,18 @@ export const createOrder = async (order: Partial<Order>) => {
   const { data, error } = await supabase
     .from("orders")
     .insert([order])
+    .select()
+    .single();
+
+  return { data, error };
+};
+
+// Update order (manual or from customer)
+export const updateOrder = async (orderId: string, updates: Partial<Order>) => {
+  const { data, error } = await supabase
+    .from("orders")
+    .update(updates)
+    .eq("id", orderId)
     .select()
     .single();
 

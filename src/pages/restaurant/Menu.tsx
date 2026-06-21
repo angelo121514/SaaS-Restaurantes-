@@ -405,19 +405,19 @@ const MenuItemModal: React.FC<MenuItemModalProps> = ({
       addons: formData.addons.length > 0 ? formData.addons : undefined,
     };
 
-    let success = false;
+    let result;
     if (mode === "add") {
-      success = await createMenuItem(menuItemData);
+      result = await createMenuItem(menuItemData);
     } else if (item) {
-      success = await updateMenuItem(item.id, menuItemData);
+      result = await updateMenuItem(item.id, menuItemData);
     }
 
     setLoading(false);
 
-    if (success) {
+    if (result && result.success) {
       onClose();
     } else {
-      setError(`No se pudo ${mode === "add" ? "agregar" : "editar"} el plato`);
+      setError(result?.error || `No se pudo ${mode === "add" ? "agregar" : "editar"} el plato`);
     }
   };
 

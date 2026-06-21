@@ -19,7 +19,9 @@ export const APP_CONFIG = {
     free_trial: {
       name: "Prueba Gratuita",
       price: 0,
+      price_usd: 0,
       price_annual: 0,
+      price_annual_usd: 0,
       duration: "30 días",
       features: [
         "Hasta 50 pedidos/mes",
@@ -31,7 +33,9 @@ export const APP_CONFIG = {
     starter: {
       name: "Básico (Starter)",
       price: 40000,
+      price_usd: 45,
       price_annual: 408000, // 40.000 * 12 * 0.85 (15% ahorro)
+      price_annual_usd: 459, // 45 * 12 * 0.85 (15% ahorro)
       duration: "por mes",
       features: [
         "Pedidos ilimitados",
@@ -44,7 +48,9 @@ export const APP_CONFIG = {
     pro: {
       name: "Pro",
       price: 120000,
+      price_usd: 130,
       price_annual: 1224000, // 120.000 * 12 * 0.85 (15% ahorro)
+      price_annual_usd: 1326, // 120.000 * 12 * 0.85 (15% ahorro)
       duration: "por mes",
       features: [
         "Todo lo del plan Básico",

@@ -1017,7 +1017,7 @@ class MockSupabaseClient {
           status: isTrialPlan ? "trial" : "active",
           is_active: true,
           trial_ends_at: isTrialPlan 
-            ? new Date(Date.now() + 15 * 24 * 60 * 60 * 1000).toISOString()
+            ? new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString()
             : undefined,
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString(),
@@ -1118,7 +1118,7 @@ class MockSupabaseClient {
           status: isTrialPlan ? "trial" : "active",
           is_active: true,
           trial_ends_at: isTrialPlan 
-            ? new Date(Date.now() + 15 * 24 * 60 * 60 * 1000).toISOString()
+            ? new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString()
             : undefined,
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString(),

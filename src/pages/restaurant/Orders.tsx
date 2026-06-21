@@ -478,19 +478,31 @@ const Orders: React.FC = () => {
 
                   {order.status === "accepted" && (
                     <>
-                      <Button
-                        variant="secondary"
-                        size="sm"
-                        fullWidth
-                        onClick={() => {
-                          setSelectedOrder(order);
-                          setPaymentMethod((order.payment_method as any) || "cash");
-                          setTransactionId(order.payment_transaction_id || "");
-                          setShowPaymentModal(true);
-                        }}
-                      >
-                        Pagar
-                      </Button>
+                      {order.payment_status === "paid" ? (
+                        <Button
+                          variant="secondary"
+                          size="sm"
+                          fullWidth
+                          onClick={() => handleStatusUpdate(order.id, "completed")}
+                          className="!bg-emerald-600 hover:!bg-emerald-700 text-white font-bold border-0"
+                        >
+                          Listo
+                        </Button>
+                      ) : (
+                        <Button
+                          variant="secondary"
+                          size="sm"
+                          fullWidth
+                          onClick={() => {
+                            setSelectedOrder(order);
+                            setPaymentMethod((order.payment_method as any) || "cash");
+                            setTransactionId(order.payment_transaction_id || "");
+                            setShowPaymentModal(true);
+                          }}
+                        >
+                          Pagar
+                        </Button>
+                      )}
                       <Button
                         variant="outline"
                         size="sm"
