@@ -36,6 +36,7 @@ import {
   getCustomerOrders,
 } from "../../services/restaurantService";
 import type { MenuItem, Order, OrderItem, Customer } from "../../config/supabase";
+import { supabase } from "../../config/supabase";
 import { formatCurrency as baseFormatCurrency } from "../../utils/helpers";
 import { useRestaurantId, useAuth } from "../../hooks/useAuth";
 import { APP_CONFIG } from "../../config/config";
@@ -90,6 +91,7 @@ const Pos: React.FC = () => {
   const [customerOrders, setCustomerOrders] = useState<Order[]>([]);
   const [customerFavorites, setCustomerFavorites] = useState<string[]>([]);
   const [currentOrderId, setCurrentOrderId] = useState<string | null>(null);
+  const [pendingQrOrders, setPendingQrOrders] = useState<Order[]>([]);
   
   // Print Ticket State
   const [printTicketData, setPrintTicketData] = useState<any | null>(null);
@@ -125,6 +127,85 @@ const Pos: React.FC = () => {
     if (!restaurantId) return;
     loadCustomers();
   }, [restaurantId]);
+
+  useEffect(() => {
+    if (!restaurantId) return;
+
+    const fetchPendingQrOrders = async () => {
+      const { data, error } = await supabase
+        .from("orders")
+        .select("*")
+        .eq("restaurant_id", restaurantId)
+        .eq("order_type", "qr")
+        .eq("payment_status", "pending")
+        .order("created_at", { ascending: false });
+
+      if (!error && data) {
+        setPendingQrOrders(data);
+      }
+    };
+
+    fetchPendingQrOrders();
+
+    const subscription = supabase
+      .channel(`restaurant-pending-qr-${restaurantId}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "orders",
+          filter: `restaurant_id=eq.${restaurantId}`,
+        },
+        () => {
+          fetchPendingQrOrders();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      subscription.unsubscribe();
+    };
+  }, [restaurantId]);
+
+  const handleLoadQrOrder = (qrOrder: Order) => {
+    const loadedCart: CartItem[] = (qrOrder.items || []).map((item: any) => {
+      const dbMenuItem = menuItems.find((m) => m.id === item.menu_item_id);
+      
+      const menuItem: MenuItem = dbMenuItem || {
+        id: item.menu_item_id,
+        restaurant_id: restaurantId || "",
+        name: item.name,
+        category: "Otro",
+        base_price: item.base_price,
+        is_available: true,
+        image_url: "",
+        created_at: new Date().toISOString(),
+      };
+
+      const sizePart = item.selected_size ? item.selected_size.name : "";
+      const addonsPart = (item.selected_addons || []).map((a: any) => a.name).join("_");
+      const cartItemId = `${item.menu_item_id}_${sizePart}_${addonsPart}`;
+
+      return {
+        id: cartItemId,
+        menuItem,
+        quantity: item.quantity,
+        selectedSize: item.selected_size,
+        selectedAddons: item.selected_addons || [],
+        specialInstructions: item.special_instructions,
+        itemTotal: item.item_total / item.quantity,
+      };
+    });
+
+    setCart(loadedCart);
+    setTableNumber(qrOrder.table_number || "");
+    setCustomerName(qrOrder.customer_name || "");
+    setCustomerPhone(qrOrder.customer_phone || "");
+    setCustomerNotes(qrOrder.customer_notes || "");
+    setOrderType(qrOrder.order_type === "qr" ? "table" : (qrOrder.order_type as any) || "table");
+    setCurrentOrderId(qrOrder.id);
+  };
 
   useEffect(() => {
     const fetchCustomerHistory = async () => {
@@ -354,7 +435,7 @@ const Pos: React.FC = () => {
       subtotal,
       tax,
       total,
-      status: finalStatus,
+      status: (finalStatus === "completed" && orderType === "counter" && !currentOrderId) ? "completed" : "accepted",
       payment_method: paymentMethod,
       payment_status: finalStatus === "completed" ? "paid" : "pending",
       customer_notes: customerNotes.trim() || undefined,
@@ -553,6 +634,39 @@ const Pos: React.FC = () => {
             </button>
           )}
         </div>
+
+        {/* Pending QR Orders Notification */}
+        {pendingQrOrders.length > 0 && (
+          <div className="p-3 bg-amber-500/10 border-b border-amber-500/20 space-y-2">
+            <div className="flex items-center justify-between">
+              <span className="text-[10px] font-extrabold text-amber-600 dark:text-amber-400 uppercase tracking-wider flex items-center gap-1.5">
+                <span className="w-2 h-2 rounded-full bg-amber-500 animate-ping inline-block" />
+                {pendingQrOrders.length} Pedido{pendingQrOrders.length > 1 ? 's' : ''} QR Pendiente{pendingQrOrders.length > 1 ? 's' : ''}
+              </span>
+            </div>
+            <div className="space-y-1.5 max-h-32 overflow-y-auto">
+              {pendingQrOrders.map((qrOrder) => (
+                <div key={qrOrder.id} className="bg-bg border border-amber-500/30 rounded-lg p-2.5 flex justify-between items-center text-xs shadow-sm">
+                  <div className="min-w-0 flex-1">
+                    <p className="font-extrabold text-text truncate">
+                      {qrOrder.table_number ? `Mesa: ${qrOrder.table_number}` : 'Llevar / Mostrador'}
+                    </p>
+                    <p className="text-[10px] text-text-secondary truncate">
+                      {qrOrder.customer_name || 'Cliente'} • {formatCurrency(qrOrder.total)}
+                    </p>
+                  </div>
+                  <Button
+                    size="sm"
+                    onClick={() => handleLoadQrOrder(qrOrder)}
+                    className="bg-amber-600 hover:bg-amber-700 text-white font-bold py-1 px-2.5 rounded text-[10px] ml-2 shrink-0 border-0"
+                  >
+                    Cobrar
+                  </Button>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* Cart items list */}
         <div className="flex-1 overflow-y-auto p-4 space-y-3">

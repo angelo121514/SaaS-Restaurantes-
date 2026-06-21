@@ -203,5 +203,18 @@ CREATE POLICY restaurants_owner_select ON public.restaurants
     OR (is_active = TRUE AND status IN ('active', 'trial'))
   );
 
--- 8. Forzar recarga del caché de esquema en PostgREST
+-- 8. Corregir políticas RLS en la tabla orders para permitir que los usuarios públicos (clientes de restaurantes en prueba) creen pedidos
+DROP POLICY IF EXISTS "Public can create orders" ON public.orders;
+CREATE POLICY "Public can create orders" ON public.orders
+  FOR INSERT TO authenticated, anon
+  WITH CHECK (
+    EXISTS (
+      SELECT 1 FROM public.restaurants r
+      WHERE r.id = orders.restaurant_id
+        AND r.is_active = true
+        AND r.status IN ('active', 'trial')
+    )
+  );
+
+-- 9. Forzar recarga del caché de esquema en PostgREST
 NOTIFY pgrst, 'reload schema';
