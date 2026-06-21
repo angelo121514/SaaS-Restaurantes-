@@ -379,7 +379,7 @@ const RegisterPage: React.FC = () => {
           <p className="text-text-secondary text-sm leading-relaxed">
             Tu restaurante <strong className="text-text">{formData.restaurant_name}</strong> ha sido registrado con éxito. 
             {isTrial 
-              ? " Tu período de prueba de 30 días ha comenzado. " 
+              ? " Tu período de prueba de 15 días ha comenzado. " 
               : ` El pago de tu plan ${activePlan?.name} fue procesado correctamente.`}
           </p>
 
@@ -504,7 +504,7 @@ const RegisterPage: React.FC = () => {
               }`}
             >
               <div>
-                <h3 className="font-bold text-lg text-text">Demo 30 Días</h3>
+                <h3 className="font-bold text-lg text-text">Demo 15 Días</h3>
                 <p className="text-xs text-text-secondary mt-1">Prueba gratis inicial</p>
                 <div className="my-4">
                   <span className="text-2xl font-black text-text">$0</span>
@@ -601,7 +601,7 @@ const RegisterPage: React.FC = () => {
                   </div>
                   <h3 className="font-bold text-text text-lg">Activación de Prueba Gratuita</h3>
                   <p className="text-text-secondary text-sm max-w-md mx-auto">
-                    Tendrás acceso completo al sistema durante 30 días para evaluar la plataforma en tu local. No se requiere tarjeta de crédito.
+                    Tendrás acceso completo al sistema durante 15 días para evaluar la plataforma en tu local. No se requiere tarjeta de crédito.
                   </p>
                   <Button 
                     type="submit" 

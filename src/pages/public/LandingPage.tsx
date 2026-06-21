@@ -141,7 +141,7 @@ const LandingPage: React.FC = () => {
               <div className="flex flex-col sm:flex-row gap-4 pt-2">
                 <Link to="/register">
                   <Button size="lg" className="bg-red-600 hover:bg-red-700 text-white border-0 px-8 flex items-center gap-2 font-bold shadow-lg shadow-red-600/20">
-                    Iniciar Prueba Gratis 30 Días
+                    Iniciar Prueba Gratis 15 Días
                     <ArrowRight className="w-5 h-5" />
                   </Button>
                 </Link>
@@ -279,7 +279,7 @@ const LandingPage: React.FC = () => {
               Planes Simples y Transparentes
             </h2>
             <p className="text-base text-text-secondary">
-              Comienza hoy mismo con una prueba completamente gratuita por 30 días. Sin tarjetas obligatorias.
+              Comienza hoy mismo con una prueba completamente gratuita por 15 días. Sin tarjetas obligatorias.
             </p>
           </div>
 
@@ -414,7 +414,7 @@ const LandingPage: React.FC = () => {
                 step: "01",
                 title: "Registra tu Negocio",
                 description:
-                  "Completa el formulario en un minuto. Tu cuenta se activará con una prueba Pro gratuita de 30 días automáticamente.",
+                  "Completa el formulario en un minuto. Tu cuenta se activará con una prueba Pro gratuita de 15 días automáticamente.",
               },
               {
                 step: "02",
@@ -452,7 +452,7 @@ const LandingPage: React.FC = () => {
               ¿Listo para subir el nivel de tu carta?
             </h2>
             <p className="text-base md:text-lg mb-8 text-red-100 max-w-2xl mx-auto font-medium">
-              Obtén acceso completo por 30 días. Automatiza la toma de pedidos, fideliza clientes con el CRM Pro y optimiza costos.
+              Obtén acceso completo por 15 días. Automatiza la toma de pedidos, fideliza clientes con el CRM Pro y optimiza costos.
             </p>
             <Link to="/register">
               <Button

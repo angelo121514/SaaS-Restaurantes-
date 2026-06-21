@@ -560,7 +560,6 @@ const Pos: React.FC = () => {
             <Alert
               type="success"
               message={successMessage}
-              className="bg-emerald-50 border-emerald-250 text-emerald-800"
             />
           )}
 
@@ -568,12 +567,11 @@ const Pos: React.FC = () => {
             <Alert
               type="info"
               message="Pedido enviado a cocina. Pulsa 'Pagar' para completar y cerrar."
-              className="bg-blue-50 border-blue-200 text-blue-800"
             />
           )}
 
           {orderError && (
-            <Alert type="error" message={orderError} className="bg-red-50 border-red-200 text-red-800" />
+            <Alert type="error" message={orderError} />
           )}
 
           {cart.length === 0 ? (
