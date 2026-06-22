@@ -24,6 +24,10 @@
 // =====================================================================
 // @ts-nocheck — Deno runtime (no usa tipos de Node)
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import {
+  handleOptions,
+  jsonResponse,
+} from "../_shared/cors.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_ROLE = Deno.env.get("SUPABASE_SERVICE_ROLE") || Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -34,16 +38,8 @@ const supabase = createClient(SUPABASE_URL, SERVICE_ROLE, {
   auth: { autoRefreshToken: false, persistSession: false },
 });
 
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Methods": "POST, OPTIONS",
-  "Access-Control-Allow-Headers": "authorization, content-type, x-client-info, apikey",
-};
-
 Deno.serve(async (req) => {
-  if (req.method === "OPTIONS") {
-    return new Response("ok", { headers: corsHeaders });
-  }
+  const options = handleOptions(req); if (options) return options;
 
   try {
     // 1. Traer invitaciones pendientes
@@ -56,7 +52,7 @@ Deno.serve(async (req) => {
 
     if (qErr) throw qErr;
     if (!pending || pending.length === 0) {
-      return json({ processed: 0 }, 200);
+      return jsonResponse(req, { processed: 0 }, 200);
     }
 
     let processed = 0;
@@ -91,16 +87,9 @@ Deno.serve(async (req) => {
       processed++;
     }
 
-    return json({ processed, failed }, 200);
+    return jsonResponse(req, { processed, failed }, 200);
   } catch (err) {
     console.error("invite-owner error:", err);
-    return json({ error: String(err) }, 500);
+    return jsonResponse(req, { error: String(err) }, 500);
   }
 });
-
-function json(body: unknown, status: number) {
-  return new Response(JSON.stringify(body), {
-    status,
-    headers: { ...corsHeaders, "Content-Type": "application/json" },
-  });
-}

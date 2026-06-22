@@ -8,6 +8,10 @@
 // =====================================================================
 // @ts-nocheck
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import {
+  handleOptions,
+  jsonResponse,
+} from "../_shared/cors.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_ROLE =
@@ -17,12 +21,6 @@ const SERVICE_ROLE =
 const supabase = createClient(SUPABASE_URL, SERVICE_ROLE, {
   auth: { autoRefreshToken: false, persistSession: false },
 });
-
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Methods": "POST, OPTIONS",
-  "Access-Control-Allow-Headers": "authorization, content-type, x-client-info, apikey",
-};
 
 // Inmediato; usamos 1 día solo para tracking.
 const SLA_DAYS = 1;
@@ -34,17 +32,8 @@ const VALID_SCOPES = new Set([
   "third_party_share",
 ]);
 
-function json(body: unknown, status: number) {
-  return new Response(JSON.stringify(body), {
-    status,
-    headers: { ...corsHeaders, "Content-Type": "application/json" },
-  });
-}
-
 Deno.serve(async (req) => {
-  if (req.method === "OPTIONS") {
-    return new Response("ok", { headers: corsHeaders });
-  }
+  const options = handleOptions(req); if (options) return options;
 
   try {
     const body = await req.json().catch(() => ({}));
@@ -54,16 +43,16 @@ Deno.serve(async (req) => {
     const scope = String(payload.scope || "");
 
     if (!email || !email.includes("@")) {
-      return json({ success: false, error: "email inválido" }, 400);
+      return jsonResponse(req, { success: false, error: "email inválido" }, 400);
     }
     if (type !== "revoke-consent") {
-      return json(
+      return jsonResponse(req, 
         { success: false, error: "type debe ser 'revoke-consent'" },
         400
       );
     }
     if (!VALID_SCOPES.has(scope)) {
-      return json(
+      return jsonResponse(req, 
         { success: false, error: "payload.scope inválido" },
         400
       );
@@ -77,7 +66,7 @@ Deno.serve(async (req) => {
       .eq("subject_email", email)
       .gte("created_at", since);
     if ((count ?? 0) >= 3) {
-      return json(
+      return jsonResponse(req, 
         { success: false, error: "Límite de 3 solicitudes por mes alcanzado." },
         429
       );
@@ -104,7 +93,7 @@ Deno.serve(async (req) => {
           payload: { scope },
         },
       ])
-      .select("id, verification_token")
+      .select("id")
       .single();
     if (insErr) throw insErr;
 
@@ -138,11 +127,10 @@ Deno.serve(async (req) => {
       },
     ]);
 
-    return json(
+    return jsonResponse(req, 
       {
         success: true,
         requestId: inserted.id,
-        verificationToken: inserted.verification_token,
         message: `Consentimiento '${scope}' revocado inmediatamente.`,
         data: result,
       },
@@ -150,6 +138,6 @@ Deno.serve(async (req) => {
     );
   } catch (err) {
     console.error("privacy-revoke-consent error:", err);
-    return json({ success: false, error: String(err) }, 500);
+    return jsonResponse(req, { success: false, error: String(err) }, 500);
   }
 });
