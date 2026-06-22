@@ -216,5 +216,11 @@ CREATE POLICY "Public can create orders" ON public.orders
     )
   );
 
--- 9. Forzar recarga del caché de esquema en PostgREST
+-- 9. Permitir que los usuarios públicos puedan leer los pedidos (necesario para el RETURNING/select tras insertar)
+DROP POLICY IF EXISTS "Public can view orders" ON public.orders;
+CREATE POLICY "Public can view orders" ON public.orders
+  FOR SELECT TO anon
+  USING (true);
+
+-- 10. Forzar recarga del caché de esquema en PostgREST
 NOTIFY pgrst, 'reload schema';
