@@ -33,7 +33,7 @@ Mientras dura el contrato. Tras la baja: identidad y contacto anonimizados a los
 
 ## Sus derechos
 
-Puede ejercer acceso, rectificación, cancelación, oposición, portabilidad y revocación del consentimiento escribiendo a `dpo@cmorflow.cl` (plazo máximo 30 días). Puede también reclamar ante la autoridad competente en protección de datos.
+Puede ejercer acceso, rectificación, cancelación, oposición, portabilidad y revocación del consentimiento escribiendo a `dpo@cmorflow.cl` (plazo máximo: 10 días hábiles, prorrogables a 15 en casos complejos, conforme al art. 19 Ley N° 21.719). Puede también reclamar ante la autoridad competente en protección de datos.
 
 ## Al aceptar este aviso
 

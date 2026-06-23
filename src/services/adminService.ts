@@ -315,7 +315,7 @@ export const getPlatformStats = async () => {
     ]);
 
     const todayRevenue =
-      todayOrders?.reduce((sum, order) => sum + (order.total || 0), 0) || 0;
+      todayOrders?.reduce((sum: number, order: any) => sum + (order.total || 0), 0) || 0;
 
     return {
       activeRestaurants: activeRestaurants || 0,

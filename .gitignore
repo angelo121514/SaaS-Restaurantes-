@@ -39,3 +39,12 @@ NOTAS.md
 *.tmp
 *.bak
 PROGRESS.md
+
+# Fase 0 — Testing & Backups
+/backups/
+/coverage/
+/playwright-report/
+/test-results/
+/playwright/.cache/
+/supabase/.branches
+/supabase/.temp

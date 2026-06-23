@@ -64,7 +64,7 @@ Conforme al artículo 19 de la Ley N° 19.628 y la Ley N° 21.719, el titular pu
 - **Portabilidad:** recibir los datos en formato estructurado (JSON y CSV).
 - **Revocación del consentimiento:** retirar el consentimiento otorgado para los tratamientos basados en él (marketing, analítica), sin afectar la licitud del tratamiento anterior.
 
-El ejercicio se realiza escribiendo a `dpo@cmorflow.cl` o por el formulario `/legal/contacto-dpo`. Plazos máximos: 30 días corridos para acceso, cancelación, oposición y portabilidad; 15 días para rectificación. La verificación de identidad se realiza mediante un token de un solo uso al correo declarado.
+El ejercicio se realiza escribiendo a `dpo@cmorflow.cl` o por el formulario `/legal/contacto-dpo`. Plazos máximos: 10 días hábiles, prorrogables por 5 días hábiles adicionales en casos complejos (art. 19 Ley N° 21.719). La verificación de identidad se realiza mediante un token de un solo uso al correo declarado.
 
 ## 7. Plazo de conservación
 
@@ -81,7 +81,7 @@ Los plazos operativos (no los legales) se detallan en `docs/privacidad/RAT.md` y
 
 - Email: `dpo@cmorflow.cl`
 - Formulario: `/legal/contacto-dpo`
-- SLA máximo de respuesta: 30 días corridos (ver `docs/legal/contacto_dpo.md`).
+- SLA máximo de respuesta: 10 días hábiles prorrogables a 15 (art. 19 Ley N° 21.719) (ver `docs/legal/contacto_dpo.md`).
 
 ## 9. Base legal del tratamiento
 

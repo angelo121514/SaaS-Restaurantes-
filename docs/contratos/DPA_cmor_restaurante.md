@@ -59,7 +59,7 @@ A la terminación del servicio, el Encargado devuelve al Responsable los datos p
 
 ### Cláusula 11 — Derechos de los titulares
 
-El Encargado asiste al Responsable en la atención de las solicitudes de los titulares (art. 19 Ley N° 19.628), poniendo a disposición los mecanismos técnicos para ejercicio de los derechos (Edge Functions `privacy/*` y la cola `data_subject_requests`), dentro de los plazos legales (30 días, salvo rectificación con 15 días).
+El Encargado asiste al Responsable en la atención de las solicitudes de los titulares (art. 19 Ley N° 21.719), poniendo a disposición los mecanismos técnicos para ejercicio de los derechos (Edge Functions `privacy/*` y la cola `data_subject_requests`), dentro de los plazos legales (10 días hábiles, prorrogables a 15 en casos complejos; 5 días hábiles para rectificación).
 
 ### Cláusula 12 — Auditoría anual
 

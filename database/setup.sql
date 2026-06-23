@@ -441,14 +441,28 @@ ALTER TABLE orders REPLICA IDENTITY FULL;
 ALTER PUBLICATION supabase_realtime ADD TABLE orders;
 
 -- =====================================================
--- INSERT DEFAULT ADMIN USER
+-- INSERT DEFAULT ADMIN USER — P0-4 Remediación
 -- =====================================================
--- Email: admin@foodorder.com
--- Password: admin123
--- Hash: SHA-256 of "admin123"
-INSERT INTO admin_users (email, password_hash, name, is_super_admin)
-VALUES ('admin@foodorder.com', '240be518fabd2724ddb6f04eeb1da5967448d7e831c08c8fa822809f74c720a9', 'System Admin', TRUE)
-ON CONFLICT (email) DO NOTHING;
+-- ELIMINADO: el seed con admin@foodorder.com / admin123 (SHA-256 sin salt)
+-- era un vector de pass-the-hash y rainbow tables.
+--
+-- Para crear el admin, seguir UNA de estas opciones:
+--   1. Supabase Dashboard → Authentication → Users → Add user
+--      (recomendado — usa bcrypt cost 10 server-side)
+--   2. database/seed_admin.sql (Opción A o B)
+--
+-- Tras crear el admin en auth.users, ejecutar:
+--   UPDATE auth.users
+--   SET raw_app_meta_data =
+--     jsonb_set(COALESCE(raw_app_meta_data, '{}'::jsonb), '{role}', '"admin"')
+--   WHERE email = 'admin@cmorflow.cl';
+--
+-- Y crear el perfil:
+--   INSERT INTO public.profiles (id, role, display_name)
+--     SELECT id, 'admin', 'Administrador'
+--     FROM auth.users
+--     WHERE email = 'admin@cmorflow.cl'
+--   ON CONFLICT (id) DO NOTHING;
 
 -- =====================================================
 -- VERIFICATION
@@ -461,9 +475,7 @@ BEGIN
   RAISE NOTICE '✓ RLS policies enabled';
   RAISE NOTICE '✓ Real-time replication configured';
   RAISE NOTICE '';
-  RAISE NOTICE 'Admin Login:';
-  RAISE NOTICE '  Email: admin@foodorder.com';
-  RAISE NOTICE '  Password: admin123';
+  RAISE NOTICE 'Admin user: NO seed incluido — crear manualmente (ver comentario arriba)';
   RAISE NOTICE '';
   RAISE NOTICE 'Next: Enable real-time in Supabase Dashboard > Database > Replication';
 END $$;

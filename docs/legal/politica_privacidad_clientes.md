@@ -55,7 +55,7 @@ Cmor Flow procesa los datos en infraestructura de Vercel y Supabase ubicada en *
 Conforme al artículo 19 de la Ley N° 19.628 y la Ley N° 21.719, el cliente final puede ejercer:
 
 - **Acceso, rectificación, cancelación, oposición y portabilidad**, y **revocación del consentimiento**, dirigiéndose al restaurante o a `dpo@cmorflow.cl`.
-- Plazo máximo de respuesta: 30 días corridos (15 días para rectificación).
+- Plazo máximo de respuesta: 10 días hábiles, prorrogables por 5 días hábiles en casos complejos (art. 19 Ley N° 21.719). Rectificación: 5 días hábiles.
 - La cancelación puede concretarse como **anonimización** de los campos personales cuando exista obligación legal de conservar el registro (p. ej., el registro tributario del pedido exigido por el SII).
 
 ## 7. Plazo de conservación

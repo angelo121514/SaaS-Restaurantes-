@@ -1,22 +1,36 @@
 import React, { useState, useRef } from "react";
 import { UploadCloud, X, Image as ImageIcon } from "lucide-react";
+import { supabase } from "../config/supabase";
 
 interface ImageDropZoneProps {
-  value?: string; // Base64 or image URL
+  value?: string; // URL firmada de Storage o Base64 legacy
   onChange: (value: string) => void;
   label?: string;
   maxSizeMB?: number;
+  /** Carpeta dentro del bucket menu-images: usar `restaurant_id` o `restaurant_id/menu_item_id` */
+  storagePath?: string;
+  /** Si true, sube a Storage. Si false, usa base64 (legacy). Default: true si supabase real está activo. */
+  useStorage?: boolean;
 }
+
+const BUCKET = "menu-images";
 
 export const ImageDropZone: React.FC<ImageDropZoneProps> = ({
   value,
   onChange,
   label = "Imagen del Plato",
   maxSizeMB = 2,
+  storagePath,
+  useStorage,
 }) => {
   const [isDragActive, setIsDragActive] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [uploading, setUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Detectar si Supabase real está activo (no mock)
+  const shouldUseStorage =
+    useStorage ?? (!!storagePath && !!(supabase as any)?.auth?.getSession);
 
   const handleDrag = (e: React.DragEvent) => {
     e.preventDefault();
@@ -31,24 +45,60 @@ export const ImageDropZone: React.FC<ImageDropZoneProps> = ({
   const processFile = async (file: File) => {
     setError(null);
 
-    // Validate type
     if (!file.type.startsWith("image/")) {
       setError("Por favor, selecciona solo archivos de imagen (PNG, JPG, JPEG, WEBP)");
       return;
     }
 
-    // Validate size (e.g., max 2MB to prevent large Base64 loads in localStorage)
     if (file.size > maxSizeMB * 1024 * 1024) {
       setError(`La imagen es demasiado grande. El tamaño máximo permitido es ${maxSizeMB}MB`);
       return;
     }
 
     try {
-      const compressedBase64 = await compressAndResizeImage(file);
-      onChange(compressedBase64);
+      // Comprimir siempre (reduce tamaño incluso para Storage)
+      const compressedBlob = await compressAndResizeImage(file);
+
+      if (shouldUseStorage && storagePath) {
+        // P0-8: subir a Supabase Storage
+        setUploading(true);
+        const fileName = `${Date.now()}-${Math.random().toString(36).substring(2, 8)}.jpg`;
+        const fullPath = `${storagePath}/${fileName}`;
+
+        const { error: uploadError } = await supabase.storage
+          .from(BUCKET)
+          .upload(fullPath, compressedBlob, {
+            contentType: "image/jpeg",
+            upsert: false,
+          });
+
+        if (uploadError) throw uploadError;
+
+        // Generar URL firmada (100 años = prácticamente permanente)
+        const { data: signedUrlData } = await supabase.storage
+          .from(BUCKET)
+          .createSignedUrl(fullPath, 60 * 60 * 24 * 365 * 100); // 100 años
+
+        if (!signedUrlData?.signedUrl) {
+          throw new Error("No se pudo generar URL firmada");
+        }
+
+        onChange(signedUrlData.signedUrl);
+      } else {
+        // Legacy: base64 (cuando no hay storagePath o modo mock)
+        const reader = new FileReader();
+        reader.readAsDataURL(compressedBlob);
+        reader.onload = () => onChange(reader.result as string);
+      }
     } catch (err) {
-      console.error("Error reading file:", err);
-      setError("Ocurrió un error al procesar la imagen.");
+      console.error("Error procesando imagen:", err);
+      setError(
+        shouldUseStorage
+          ? "Ocurrió un error al subir la imagen a Storage. Verifica tu conexión e inténtalo de nuevo."
+          : "Ocurrió un error al procesar la imagen."
+      );
+    } finally {
+      setUploading(false);
     }
   };
 
@@ -56,7 +106,6 @@ export const ImageDropZone: React.FC<ImageDropZoneProps> = ({
     e.preventDefault();
     e.stopPropagation();
     setIsDragActive(false);
-
     if (e.dataTransfer.files && e.dataTransfer.files[0]) {
       processFile(e.dataTransfer.files[0]);
     }
@@ -68,21 +117,16 @@ export const ImageDropZone: React.FC<ImageDropZoneProps> = ({
     }
   };
 
-  const fileToBase64 = (file: File): Promise<string> => {
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.readAsDataURL(file);
-      reader.onload = () => resolve(reader.result as string);
-      reader.onerror = (err) => reject(err);
-    });
-  };
-
+  /**
+   * Comprime y redimensiona la imagen antes de subir.
+   * Devuelve un Blob (más eficiente que base64).
+   */
   const compressAndResizeImage = (
     file: File,
     maxWidth = 800,
     maxHeight = 800,
     quality = 0.7
-  ): Promise<string> => {
+  ): Promise<Blob> => {
     return new Promise((resolve, reject) => {
       const reader = new FileReader();
       reader.readAsDataURL(file);
@@ -116,10 +160,14 @@ export const ImageDropZone: React.FC<ImageDropZoneProps> = ({
           }
 
           ctx.drawImage(img, 0, 0, width, height);
-          
-          const mimeType = file.type === "image/png" ? "image/png" : "image/jpeg";
-          const compressedBase64 = canvas.toDataURL(mimeType, quality);
-          resolve(compressedBase64);
+          canvas.toBlob(
+            (blob) => {
+              if (blob) resolve(blob);
+              else reject(new Error("Failed to create blob"));
+            },
+            "image/jpeg",
+            quality
+          );
         };
         img.onerror = (err) => reject(err);
       };
@@ -128,16 +176,30 @@ export const ImageDropZone: React.FC<ImageDropZoneProps> = ({
   };
 
   const onZoneClick = () => {
-    fileInputRef.current?.click();
+    if (!uploading) fileInputRef.current?.click();
   };
 
-  const removeImage = (e: React.MouseEvent) => {
+  const removeImage = async (e: React.MouseEvent) => {
     e.stopPropagation();
+    // Si la URL es de Storage, opcionalmente borrar el objeto
+    if (shouldUseStorage && value && value.includes("supabase.co/storage")) {
+      try {
+        // Extraer path de la URL firmada
+        const url = new URL(value);
+        const pathSegments = url.pathname.split("/");
+        const bucketIdx = pathSegments.indexOf(BUCKET);
+        if (bucketIdx >= 0 && bucketIdx < pathSegments.length - 1) {
+          const objectPath = decodeURIComponent(pathSegments.slice(bucketIdx + 1).join("/"));
+          // Best-effort delete (no bloquear UI si falla)
+          await supabase.storage.from(BUCKET).remove([objectPath]);
+        }
+      } catch (err) {
+        console.warn("No se pudo borrar objeto de Storage:", err);
+      }
+    }
     onChange("");
     setError(null);
-    if (fileInputRef.current) {
-      fileInputRef.current.value = "";
-    }
+    if (fileInputRef.current) fileInputRef.current.value = "";
   };
 
   return (
@@ -151,6 +213,8 @@ export const ImageDropZone: React.FC<ImageDropZoneProps> = ({
         onDrop={handleDrop}
         onClick={onZoneClick}
         className={`relative w-full rounded-lg border-2 border-dashed p-6 text-center cursor-pointer transition-all duration-200 overflow-hidden flex flex-col items-center justify-center min-h-[160px] ${
+          uploading ? "opacity-60 cursor-wait" : ""
+        } ${
           value
             ? "border-zinc-300 bg-zinc-50"
             : isDragActive
@@ -164,17 +228,23 @@ export const ImageDropZone: React.FC<ImageDropZoneProps> = ({
           className="hidden"
           accept="image/*"
           onChange={handleFileInput}
+          disabled={uploading}
         />
 
-        {value ? (
-          // Image Preview State
+        {uploading ? (
+          <div className="space-y-2 pointer-events-none select-none">
+            <div className="mx-auto w-12 h-12 rounded-full bg-zinc-50 border flex items-center justify-center animate-pulse">
+              <UploadCloud className="w-6 h-6 text-accent" />
+            </div>
+            <p className="text-sm text-text-secondary">Subiendo imagen...</p>
+          </div>
+        ) : value ? (
           <div className="relative w-full h-full min-h-[140px] flex items-center justify-center group">
             <img
               src={value}
               alt="Preview"
               className="max-h-[160px] rounded-lg object-contain"
             />
-            {/* Overlay Hover Actions */}
             <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity duration-200 rounded-lg flex items-center justify-center">
               <button
                 type="button"
@@ -185,7 +255,6 @@ export const ImageDropZone: React.FC<ImageDropZoneProps> = ({
                 <X className="w-5 h-5" />
               </button>
             </div>
-            {/* Quick X button always visible */}
             <button
               type="button"
               onClick={removeImage}
@@ -195,7 +264,6 @@ export const ImageDropZone: React.FC<ImageDropZoneProps> = ({
             </button>
           </div>
         ) : (
-          // Upload Prompt State
           <div className="space-y-2 pointer-events-none select-none">
             <div className="mx-auto w-12 h-12 rounded-full bg-zinc-50 border flex items-center justify-center text-text-secondary group-hover:scale-105 transition-transform duration-200">
               <UploadCloud className="w-6 h-6 text-zinc-500" />
@@ -208,6 +276,7 @@ export const ImageDropZone: React.FC<ImageDropZoneProps> = ({
             </div>
             <p className="text-xs text-text-secondary">
               Soporta PNG, JPG, JPEG, WEBP (Máx. {maxSizeMB}MB)
+              {shouldUseStorage && " · Subido a Storage"}
             </p>
           </div>
         )}

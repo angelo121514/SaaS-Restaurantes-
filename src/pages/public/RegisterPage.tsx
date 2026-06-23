@@ -242,14 +242,15 @@ const RegisterPage: React.FC = () => {
 
     setPaymentLoading(true);
 
-    // Simulate online gateway processing delay
-    await new Promise((resolve) => setTimeout(resolve, 2000));
-
+    // P0-2 Remediación: el flujo de pago real se implementará en P1-7.
+    // Por ahora, solo free_trial se auto-activa; starter/pro requieren
+    // que el webhook de la gateway llame a auto_approve_registration_v2.
+    // (La RPC rechaza planes pagos si no es admin o webhook autenticado.)
     try {
       const planConfig = APP_CONFIG.plans[selectedPlan as keyof typeof APP_CONFIG.plans];
       const amount = planConfig ? planConfig.price : 0;
-      const provider = selectedPlan === "free_trial" ? "simulator" : "credit_card";
-      const txId = (selectedPlan === "free_trial" ? "trial_" : "sim_") + Math.random().toString(36).substring(2, 11);
+      const provider = "trial"; // solo trial se auto-activa
+      const txId = "trial_" + Math.random().toString(36).substring(2, 11);
 
       // Call our secure RPC that automatically approves, activates and links profiles
       const { data, error: rpcErr } = await supabase.rpc("auto_approve_registration_v2", {
@@ -263,7 +264,15 @@ const RegisterPage: React.FC = () => {
       if (rpcErr) throw rpcErr;
 
       if (data && data.length > 0 && !data[0].success) {
-        throw new Error(data[0].message || "Error al activar el restaurante");
+        // P0-2: si la RPC rechaza por plan pago no autorizado, redirigir a flujo de pago
+        if (data[0].error === "unauthorized_paid_plan") {
+          throw new Error(
+            "Para activar el plan " + selectedPlan + " debes completar el pago. " +
+            "El flujo de pago real será implementado próximamente. " +
+            "Por ahora, regístrate con plan Free Trial y contacta a ventas@cmorflow.cl para upgrade."
+          );
+        }
+        throw new Error(data[0].message || data[0].error || "Error al activar el restaurante");
       }
 
       const createdRestaurantId = data[0].restaurant_id;

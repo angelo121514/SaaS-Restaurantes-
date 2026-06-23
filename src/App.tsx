@@ -24,6 +24,7 @@ const PublicPrivacy = lazy(() => import("./pages/public/Privacy"));
 const PublicPrivacyClients = lazy(() => import("./pages/public/PrivacyClients"));
 const PublicContactDpo = lazy(() => import("./pages/public/ContactDpo"));
 const PublicTerms = lazy(() => import("./pages/public/Terms"));
+const VerifyDsar = lazy(() => import("./pages/public/VerifyDsar"));
 import { CookieBanner } from "./components/privacy/CookieBanner";
 
 // Lightweight fallback shown while a lazy route resolves its chunk.
@@ -52,6 +53,10 @@ function App() {
           <Route path="/legal/privacidad-clientes" element={<PublicPrivacyClients />} />
           <Route path="/legal/contacto-dpo" element={<PublicContactDpo />} />
           <Route path="/legal/terminos" element={<PublicTerms />} />
+
+          {/* DSAR verification flow (P0-3) */}
+          <Route path="/verify-dsar" element={<VerifyDsar />} />
+          <Route path="/verify-dsar/:token" element={<VerifyDsar />} />
 
           {/* Restaurant Dashboard Routes */}
           <Route
