@@ -27,6 +27,7 @@ export const APP_CONFIG = {
         "Hasta 50 pedidos/mes",
         "Gestión básica de menú",
         "Pedidos por código QR",
+        "CRM Integrado de Clientes",
         "Soporte por correo electrónico",
       ],
     },

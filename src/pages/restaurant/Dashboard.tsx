@@ -66,12 +66,19 @@ const RestaurantDashboard: React.FC = () => {
     { path: "/restaurant/reports", icon: FileText, label: "Reportes" },
   ];
 
-  // If Pro plan, add CRM and AI Recommendations
+  // If Pro plan, add AI Recommendations
   const isPro = restaurant?.subscription_plan === "pro";
   if (isPro) {
     navItems.push(
-      { path: "/restaurant/crm", icon: Users, label: "CRM Clientes" },
       { path: "/restaurant/ai", icon: BrainCircuit, label: "IA Recomendaciones" }
+    );
+  }
+
+  // CRM is available for free_trial, starter, and pro plans
+  const hasCrm = ["free_trial", "starter", "pro"].includes(restaurant?.subscription_plan || "");
+  if (hasCrm) {
+    navItems.push(
+      { path: "/restaurant/crm", icon: Users, label: "CRM Clientes" }
     );
   }
 
