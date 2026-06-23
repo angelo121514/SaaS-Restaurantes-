@@ -503,12 +503,12 @@ const LandingPage: React.FC = () => {
               <h4 className="font-bold text-text text-sm uppercase tracking-wider mb-4">Empresa</h4>
               <ul className="space-y-2.5">
                 <li>
-                  <a href="#" className="text-sm text-text-secondary hover:text-red-500 transition-colors">
+                  <a href="https://wa.me/56926942853" target="_blank" rel="noopener noreferrer" className="text-sm text-text-secondary hover:text-red-500 transition-colors">
                     Contacto
                   </a>
                 </li>
                 <li>
-                  <a href="#" className="text-sm text-text-secondary hover:text-red-500 transition-colors">
+                  <a href="https://wa.me/56926942853" target="_blank" rel="noopener noreferrer" className="text-sm text-text-secondary hover:text-red-500 transition-colors">
                     Soporte Técnico
                   </a>
                 </li>
