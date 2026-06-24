@@ -1,11 +1,72 @@
 -- =====================================================================
--- CMOR FLOW — Función segura para eliminar restaurantes en cascada
+-- CMOR FLOW — Corrección de log_admin_action y eliminación de restaurantes
 -- ---------------------------------------------------------------------
--- Esta función elimina un restaurante, todas sus tablas asociadas con
--- ON DELETE CASCADE, y también limpia la tabla auth.users para sus
--- propietarios y personal mediante SECURITY DEFINER.
+-- 1. Parche para public.log_admin_action: Corrige el error de tipado
+--    "column 'ip' is of type inet but expression is of type text"
+--    añadiendo un cast seguro a ::inet.
+-- 2. Función segura para eliminar restaurantes en cascada.
 -- =====================================================================
 
+-- ─────────────────────────────────────────────────────────────────────
+-- 1. PARCHE DE AUDITORÍA: Redefinir log_admin_action con casting a ::inet
+-- ─────────────────────────────────────────────────────────────────────
+CREATE OR REPLACE FUNCTION public.log_admin_action(
+  p_action text,
+  p_target_type text DEFAULT NULL,
+  p_target_id uuid DEFAULT NULL,
+  p_before jsonb DEFAULT NULL,
+  p_after jsonb DEFAULT NULL
+)
+RETURNS void
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  v_ip inet;
+BEGIN
+  -- Obtener la IP de las cabeceras de la solicitud y castear de forma segura a inet
+  BEGIN
+    v_ip := NULLIF(split_part(current_setting('request.headers', true)::jsonb->>'x-forwarded-for', ',', 1), '')::inet;
+  EXCEPTION WHEN OTHERS THEN
+    v_ip := NULL;
+  END;
+
+  INSERT INTO public.audit_log (
+    actor_id, actor_email, action, table_name, row_id, before_state, after_state, ip
+  )
+  SELECT
+    auth.uid(),
+    COALESCE(p.email, ''),
+    p_action,
+    p_target_type,
+    p_target_id,
+    p_before,
+    p_after,
+    v_ip
+  FROM (
+    SELECT
+      (SELECT email FROM auth.users WHERE id = auth.uid()) AS email
+  ) p
+  WHERE auth.uid() IS NOT NULL;
+
+  -- Si no hay usuario autenticado (webhook con service_role), loguear como 'system'
+  IF NOT FOUND THEN
+    INSERT INTO public.audit_log (
+      actor_email, action, table_name, row_id, before_state, after_state, ip
+    ) VALUES (
+      'system', p_action, p_target_type, p_target_id, p_before, p_after,
+      v_ip
+    );
+  END IF;
+END;
+$$;
+
+GRANT EXECUTE ON FUNCTION public.log_admin_action(text, text, uuid, jsonb, jsonb) TO authenticated;
+
+-- ─────────────────────────────────────────────────────────────────────
+-- 2. ELIMINACIÓN DE RESTAURANTE: Función segura en cascada
+-- ─────────────────────────────────────────────────────────────────────
 CREATE OR REPLACE FUNCTION public.admin_delete_restaurant(p_restaurant_id uuid)
 RETURNS boolean
 LANGUAGE plpgsql
@@ -37,7 +98,7 @@ BEGIN
   --    se borrarán automáticamente gracias al ON DELETE CASCADE.
   DELETE FROM public.restaurants WHERE id = p_restaurant_id;
 
-  -- 5. Registrar en el log de auditoría usando el helper oficial del proyecto
+  -- 5. Registrar en el log de auditoría usando el helper oficial del proyecto (parcheado arriba)
   PERFORM public.log_admin_action(
     'delete_restaurant',
     'restaurant',
