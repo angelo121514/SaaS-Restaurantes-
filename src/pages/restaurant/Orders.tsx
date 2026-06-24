@@ -204,42 +204,57 @@ const Orders: React.FC = () => {
     });
 
   const handleStatusUpdate = async (orderId: string, newStatus: string) => {
+    // Guardar copia del estado anterior para poder revertir si la API falla
+    const previousOrders = [...orders];
+
+    // Actualizar el estado local de forma optimista (instantáneo en pantalla)
+    setOrders((prev) =>
+      prev.map((o) => (o.id === orderId ? { ...o, status: newStatus } : o))
+    );
+
     const success = await updateOrderStatus(orderId, newStatus);
-    if (success) {
-      setOrders((prev) =>
-        prev.map((o) => (o.id === orderId ? { ...o, status: newStatus } : o))
-      );
-    } else {
-      alert("Error al actualizar el estado del pedido");
+    if (!success) {
+      // Revertir en caso de error
+      setOrders(previousOrders);
+      alert("Error al actualizar el estado del pedido. El cambio fue revertido.");
     }
   };
 
   const handleConfirmPayment = async () => {
     if (!selectedOrder) return;
+    const orderId = selectedOrder.id;
+    const previousOrders = [...orders];
+
+    // Cerrar modal y limpiar selección de forma optimista
+    setShowPaymentModal(false);
+    setSelectedOrder(null);
+
+    // Actualizar el estado local a completado/pagado de forma optimista (instantáneo)
+    setOrders((prev) =>
+      prev.map((o) =>
+        o.id === orderId
+          ? {
+              ...o,
+              status: "completed",
+              payment_method: paymentMethod,
+              payment_transaction_id: transactionId.trim() || undefined,
+              payment_status: "paid",
+            }
+          : o
+      )
+    );
+
     setPaymentSubmitting(true);
-    const success = await updateOrderStatus(selectedOrder.id, "completed", {
+    const success = await updateOrderStatus(orderId, "completed", {
       paymentMethod,
       transactionId: transactionId.trim() || undefined,
     });
     setPaymentSubmitting(false);
-    if (success) {
-      setOrders((prev) =>
-        prev.map((o) =>
-          o.id === selectedOrder.id
-            ? {
-                ...o,
-                status: "completed",
-                payment_method: paymentMethod,
-                payment_transaction_id: transactionId.trim() || undefined,
-                payment_status: "paid",
-              }
-            : o
-        )
-      );
-      setShowPaymentModal(false);
-      setSelectedOrder(null);
-    } else {
-      alert("Error al registrar el pago");
+
+    if (!success) {
+      // Revertir en caso de error
+      setOrders(previousOrders);
+      alert("Error al registrar el pago. El cambio fue revertido.");
     }
   };
 
