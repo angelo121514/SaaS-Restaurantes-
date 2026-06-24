@@ -11,6 +11,7 @@ import {
   Calendar,
   Crown,
   Trash2,
+  MessageSquare,
 } from "lucide-react";
 import {
   Card,
@@ -50,6 +51,19 @@ const AllRestaurants: React.FC = () => {
   const [showDetailsModal, setShowDetailsModal] = useState(false);
   const [showBlockModal, setShowBlockModal] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [showContactModal, setShowContactModal] = useState(false);
+  const [contactOwnerEmail, setContactOwnerEmail] = useState("");
+  const [contactOwnerName, setContactOwnerName] = useState("");
+  const [contactOwnerPhone, setContactOwnerPhone] = useState("");
+  const [contactRestaurants, setContactRestaurants] = useState<Restaurant[]>([]);
+
+  const handleContactClick = (email: string, ownerName: string, phone: string, groupRestaurants: Restaurant[]) => {
+    setContactOwnerEmail(email);
+    setContactOwnerName(ownerName);
+    setContactOwnerPhone(phone);
+    setContactRestaurants(groupRestaurants);
+    setShowContactModal(true);
+  };
 
   const handleDeleteClick = (restaurant: Restaurant) => {
     setSelectedRestaurant(restaurant);
@@ -237,6 +251,22 @@ const AllRestaurants: React.FC = () => {
                         </p>
                       </div>
                     </div>
+                    <div className="flex items-center">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        icon={<MessageSquare className="w-4 h-4 text-accent" />}
+                        onClick={() => handleContactClick(
+                          email,
+                          ownerName,
+                          groupRestaurants[0]?.phone || "",
+                          groupRestaurants
+                        )}
+                        className="font-semibold border-accent/20 hover:bg-accent/5 hover:border-accent text-accent"
+                      >
+                        Contactar Propietario
+                      </Button>
+                    </div>
                   </div>
 
                   {/* Grouped Restaurants */}
@@ -348,6 +378,22 @@ const AllRestaurants: React.FC = () => {
         onClose={() => {
           setShowDeleteModal(false);
           setSelectedRestaurant(null);
+        }}
+      />
+
+      {/* Contact Communications Modal */}
+      <ContactModal
+        isOpen={showContactModal}
+        email={contactOwnerEmail}
+        ownerName={contactOwnerName}
+        phone={contactOwnerPhone}
+        restaurants={contactRestaurants}
+        onClose={() => {
+          setShowContactModal(false);
+          setContactOwnerEmail("");
+          setContactOwnerName("");
+          setContactOwnerPhone("");
+          setContactRestaurants([]);
         }}
       />
     </div>
@@ -725,6 +771,196 @@ const InfoItem: React.FC<InfoItemProps> = ({
         <p className="text-text font-medium">{value}</p>
       )}
     </div>
+  );
+};
+
+// Contact Modal Component
+interface ContactModalProps {
+  isOpen: boolean;
+  email: string;
+  ownerName: string;
+  phone: string;
+  restaurants: Restaurant[];
+  onClose: () => void;
+}
+
+const ContactModal: React.FC<ContactModalProps> = ({
+  isOpen,
+  email,
+  ownerName,
+  phone,
+  restaurants,
+  onClose,
+}) => {
+  const [template, setTemplate] = useState("custom");
+  const [subject, setSubject] = useState("");
+  const [body, setBody] = useState("");
+  const [copied, setCopied] = useState(false);
+
+  const restaurantName = restaurants[0]?.name || "tu restaurante";
+
+  // Update templates when selecting
+  useEffect(() => {
+    switch (template) {
+      case "custom":
+        setSubject("");
+        setBody("");
+        break;
+      case "survey":
+        setSubject(`¿Cómo ha sido tu experiencia con CMOR FLOW? ⭐`);
+        setBody(
+          `Hola ${ownerName},\n\nEspero que estés muy bien.\n\nTe escribo para saber cómo ha sido tu experiencia con tu menú digital en ${restaurantName}. Nos encantaría saber si el sistema ha facilitado tus pedidos y si tienes alguna sugerencia para mejorar.\n\n¿Podrías respondernos con tu opinión o si necesitas ayuda con algún aspecto técnico?\n\nSaludos cordiales,\nAdministración de CMOR FLOW`
+        );
+        break;
+      case "promo":
+        setSubject(`Duplica tus ventas en ${restaurantName} con tu propia Web y Código QR 🚀`);
+        setBody(
+          `Hola ${ownerName},\n\n¡Felicitaciones por el éxito de ${restaurantName}!\n\nQueremos ofrecerte una promoción exclusiva para actualizar tu cuenta al Plan Pro. Con este plan obtendrás tu propia página web posicionada en Google, opción multi-sucursal y recomendaciones automáticas con Inteligencia Artificial.\n\nPor ser cliente destacado de nuestra plataforma, te ofrecemos un 20% de descuento en tu suscripción anual.\n\nSi te interesa, respóndeme este mensaje para activar tu descuento de inmediato.\n\nUn abrazo,\nAdministración de CMOR FLOW`
+        );
+        break;
+      case "trial":
+        setSubject(`Tu período de prueba en CMOR FLOW está por finalizar ⏳`);
+        setBody(
+          `Hola ${ownerName},\n\nTe escribimos para recordarte que tu período de prueba gratuito de 15 días en CMOR FLOW para tu restaurante ${restaurantName} finalizará pronto.\n\nPara evitar interrupciones en tus pedidos digitales y conservar tu menú QR activo, te invitamos a seleccionar uno de nuestros planes activos (Starter o Pro).\n\nSi tienes dudas o necesitas asistencia con el proceso de pago, responde a este mensaje y te ayudaremos de inmediato.\n\nSaludos cordiales,\nAdministración de CMOR FLOW`
+        );
+        break;
+      default:
+        break;
+    }
+  }, [template, ownerName, restaurantName]);
+
+  const handleCopy = () => {
+    const textToCopy = subject ? `Asunto: ${subject}\n\n${body}` : body;
+    navigator.clipboard.writeText(textToCopy);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  const getEmailLink = () => {
+    return `mailto:${email}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+  };
+
+  const getWhatsAppLink = () => {
+    const cleanPhone = phone.replace(/\D/g, "");
+    const formattedPhone = cleanPhone.length === 9 ? `56${cleanPhone}` : cleanPhone;
+    return `https://wa.me/${formattedPhone}?text=${encodeURIComponent(body)}`;
+  };
+
+  if (!email) return null;
+
+  return (
+    <Modal
+      isOpen={isOpen}
+      onClose={onClose}
+      title="Centro de Comunicaciones con Clientes"
+      size="lg"
+    >
+      <div className="space-y-4">
+        {/* Info Header */}
+        <div className="bg-bg-subtle border border-border rounded-xl p-4 grid sm:grid-cols-2 gap-4 text-xs">
+          <div>
+            <p className="text-text-secondary mb-0.5">Propietario:</p>
+            <p className="font-bold text-text text-sm">{ownerName}</p>
+            <p className="text-text-secondary mt-2 mb-0.5">Correo electrónico:</p>
+            <p className="font-semibold text-text">{email}</p>
+          </div>
+          <div>
+            <p className="text-text-secondary mb-0.5">Teléfono de contacto:</p>
+            <p className="font-bold text-text text-sm">{phone || "No registrado"}</p>
+            <p className="text-text-secondary mt-2 mb-0.5">Restaurante(s):</p>
+            <p className="font-semibold text-text truncate">
+              {restaurants.map((r) => r.name).join(", ")}
+            </p>
+          </div>
+        </div>
+
+        {/* Template Select */}
+        <div className="space-y-1.5">
+          <label className="block text-xs font-bold text-text-secondary">
+            Selecciona una plantilla de mensaje:
+          </label>
+          <Select
+            value={template}
+            onChange={(e) => setTemplate(e.target.value)}
+            options={[
+              { value: "custom", label: "Mensaje Libre / Personalizado" },
+              { value: "survey", label: "Encuesta de Satisfacción ⭐" },
+              { value: "promo", label: "Ofrecer Promoción (Upgrade a Plan Pro) 🚀" },
+              { value: "trial", label: "Aviso de Vencimiento de Trial ⏳" },
+            ]}
+          />
+        </div>
+
+        {/* Subject */}
+        <div className="space-y-1.5">
+          <label className="block text-xs font-bold text-text-secondary">
+            Asunto del correo:
+          </label>
+          <Input
+            value={subject}
+            onChange={(e) => setSubject(e.target.value)}
+            placeholder="Introduce el asunto del correo..."
+          />
+        </div>
+
+        {/* Body Editor */}
+        <div className="space-y-1.5">
+          <label className="block text-xs font-bold text-text-secondary">
+            Cuerpo del mensaje:
+          </label>
+          <Textarea
+            value={body}
+            onChange={(e) => setBody(e.target.value)}
+            placeholder="Escribe tu mensaje aquí..."
+            rows={8}
+            required
+          />
+        </div>
+
+        {/* Actions */}
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-2">
+          <Button
+            type="button"
+            variant="outline"
+            fullWidth
+            onClick={handleCopy}
+            className="font-semibold"
+          >
+            {copied ? "¡Copiado!" : "Copiar Texto"}
+          </Button>
+          
+          <a
+            href={getWhatsAppLink()}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="w-full"
+          >
+            <Button
+              type="button"
+              variant="secondary"
+              fullWidth
+              className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold border-0"
+            >
+              Enviar por WhatsApp
+            </Button>
+          </a>
+
+          <a
+            href={getEmailLink()}
+            className="w-full"
+          >
+            <Button
+              type="button"
+              variant="primary"
+              fullWidth
+              className="font-bold"
+            >
+              Enviar por Correo
+            </Button>
+          </a>
+        </div>
+      </div>
+    </Modal>
   );
 };
 
