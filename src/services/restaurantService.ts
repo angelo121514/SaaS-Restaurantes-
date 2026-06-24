@@ -17,10 +17,15 @@ export const subscribeToOrders = (
   let currentOrders: Order[] = [];
 
   const fetchOrders = async () => {
+    // Limitar a los últimos 7 días para no cargar todo el historial
+    const sevenDaysAgo = new Date();
+    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+
     const { data, error } = await supabase
       .from("orders")
       .select("*")
       .eq("restaurant_id", restaurantId)
+      .gte("created_at", sevenDaysAgo.toISOString())
       .order("created_at", { ascending: false });
 
     if (!error && data) {
@@ -107,10 +112,13 @@ export const updateOrderStatus = async (
 };
 
 // Subscribe to menu items with real-time updates
+// Optimizado: muta estado local según evento (no refetch completo).
 export const subscribeToMenuItems = (
   restaurantId: string,
   callback: (items: MenuItem[]) => void
 ) => {
+  let currentItems: MenuItem[] = [];
+
   const fetchItems = async () => {
     const { data, error } = await supabase
       .from("menu_items")
@@ -119,7 +127,8 @@ export const subscribeToMenuItems = (
       .order("created_at", { ascending: false });
 
     if (!error && data) {
-      callback(data);
+      currentItems = data;
+      callback(currentItems);
     }
   };
 
@@ -135,8 +144,26 @@ export const subscribeToMenuItems = (
         table: "menu_items",
         filter: `restaurant_id=eq.${restaurantId}`,
       },
-      () => {
-        fetchItems();
+      (payload: any) => {
+        const eventType = payload.eventType;
+        const newRow = payload.new as MenuItem;
+        const oldRow = payload.old as MenuItem;
+
+        if (eventType === "INSERT" && newRow) {
+          // Evitar duplicados
+          if (!currentItems.find((i) => i.id === newRow.id)) {
+            currentItems = [newRow, ...currentItems];
+            callback(currentItems);
+          }
+        } else if (eventType === "UPDATE" && newRow) {
+          currentItems = currentItems.map((i) =>
+            i.id === newRow.id ? { ...i, ...newRow } : i
+          );
+          callback(currentItems);
+        } else if (eventType === "DELETE" && oldRow) {
+          currentItems = currentItems.filter((i) => i.id !== oldRow.id);
+          callback(currentItems);
+        }
       }
     )
     .subscribe();
@@ -240,13 +267,22 @@ async function createOrderViaRpc(order: Partial<Order>) {
 }
 
 // P1-1: helper para verificar si usar RPC create_order
+// Optimizado: caché en memoria de 5 minutos para evitar un round-trip extra por pedido.
+let _rpcFlagCache: { value: boolean; expiresAt: number } | null = null;
+const RPC_FLAG_CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutos
+
 async function shouldUseRpcCreateOrder(): Promise<boolean> {
+  if (_rpcFlagCache && Date.now() < _rpcFlagCache.expiresAt) {
+    return _rpcFlagCache.value;
+  }
   try {
     const { data } = await supabase.rpc("is_flag_enabled", {
       p_key: "use_rpc_create_order",
       p_restaurant_id: null,
     });
-    return data === true;
+    const result = data === true;
+    _rpcFlagCache = { value: result, expiresAt: Date.now() + RPC_FLAG_CACHE_TTL_MS };
+    return result;
   } catch {
     return false;
   }

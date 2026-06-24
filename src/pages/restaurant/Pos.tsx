@@ -157,8 +157,29 @@ const Pos: React.FC = () => {
           table: "orders",
           filter: `restaurant_id=eq.${restaurantId}`,
         },
-        () => {
-          fetchPendingQrOrders();
+        // Mutación local: actualizar solo el pedido afectado sin refetch completo
+        (payload: any) => {
+          const eventType = payload.eventType;
+          const newRow = payload.new;
+          const oldRow = payload.old;
+
+          if (eventType === "INSERT" && newRow?.order_type === "qr" && newRow?.payment_status === "pending") {
+            setPendingQrOrders((prev) => [newRow, ...prev.filter((o) => o.id !== newRow.id)]);
+          } else if (eventType === "UPDATE" && newRow) {
+            if (newRow.order_type === "qr" && newRow.payment_status === "pending") {
+              // Actualizar o agregar si ya cumple los filtros
+              setPendingQrOrders((prev) =>
+                prev.some((o) => o.id === newRow.id)
+                  ? prev.map((o) => (o.id === newRow.id ? { ...o, ...newRow } : o))
+                  : [newRow, ...prev]
+              );
+            } else {
+              // Ya no cumple el filtro (pagado o cambió tipo) — eliminarlo de la lista
+              setPendingQrOrders((prev) => prev.filter((o) => o.id !== newRow.id));
+            }
+          } else if (eventType === "DELETE" && oldRow) {
+            setPendingQrOrders((prev) => prev.filter((o) => o.id !== oldRow.id));
+          }
         }
       )
       .subscribe();
@@ -412,7 +433,6 @@ const Pos: React.FC = () => {
       return;
     }
 
-    setOrderSubmitting(true);
     setOrderError("");
 
     const orderData: Partial<Order> = {
@@ -442,53 +462,60 @@ const Pos: React.FC = () => {
       internal_notes: "Pedido registrado desde Caja POS",
     };
 
-    let result;
-    if (currentOrderId) {
-      // Update existing order (already sent to kitchen)
-      result = await updateOrder(currentOrderId, orderData);
+    // --- OPTIMISTIC UI: mostrar éxito y actualizar pantalla inmediatamente ---
+    // Guardar snapshot del carrito para poder revertir si Supabase falla
+    const snapshotCart = [...cart];
+    const snapshotOrderId = currentOrderId;
+
+    if (finalStatus === "completed") {
+      setSuccessMessage("¡Pedido completado y pagado exitosamente!");
+      setOrderSuccess(true);
+      setCart([]);
+      setCustomerName("");
+      setCustomerPhone("");
+      setCustomerNotes("");
+      setTableNumber("");
+      setPaymentMethod("cash");
+      setPaymentStatus("paid");
+      setSelectedCustomer(null);
+      setCustomerSearchQuery("");
+      setCurrentOrderId(null);
+      setTimeout(() => setOrderSuccess(false), 3000);
     } else {
-      // Create new order
-      result = await createOrder(orderData);
+      setSuccessMessage("¡Pedido enviado a cocina exitosamente!");
+      setOrderSuccess(true);
+      setTimeout(() => setOrderSuccess(false), 3000);
     }
 
-    setOrderSubmitting(false);
+    // --- BACKGROUND: guardar en Supabase sin bloquear la UI ---
+    try {
+      const result = snapshotOrderId
+        ? await updateOrder(snapshotOrderId, orderData)
+        : await createOrder(orderData);
 
-    if (!result.error) {
+      if (result.error) {
+        // Revertir: restaurar el carrito y mostrar error
+        setCart(snapshotCart);
+        if (snapshotOrderId) setCurrentOrderId(snapshotOrderId);
+        setOrderSuccess(false);
+        setOrderError(result.error.message || "Error al guardar el pedido. Reintenta.");
+        return;
+      }
+
+      // Éxito real: guardar ID si es pedido a cocina, o imprimir ticket
       const savedOrder = result.data;
       if (finalStatus === "completed") {
-        setSuccessMessage("¡Pedido completado y pagado exitosamente!");
-        setOrderSuccess(true);
-        if (savedOrder) {
-          setPrintTicketData(savedOrder);
-        }
-        setCart([]);
-        setCustomerName("");
-        setCustomerPhone("");
-        setCustomerNotes("");
-        setTableNumber("");
-        setPaymentMethod("cash");
-        setPaymentStatus("paid");
-        setSelectedCustomer(null);
-        setCustomerSearchQuery("");
-        setCurrentOrderId(null);
+        if (savedOrder) setPrintTicketData(savedOrder);
         loadCustomers();
-
-        setTimeout(() => {
-          setOrderSuccess(false);
-        }, 3000);
       } else {
-        // "A Cocina" - keep cart, save order ID, show success badge
-        setSuccessMessage("¡Pedido enviado a cocina exitosamente!");
-        setOrderSuccess(true);
-        if (savedOrder) {
-          setCurrentOrderId(savedOrder.id);
-        }
-        setTimeout(() => {
-          setOrderSuccess(false);
-        }, 3000);
+        if (savedOrder && !snapshotOrderId) setCurrentOrderId(savedOrder.id);
       }
-    } else {
-      setOrderError(result.error.message || "Ocurrió un error al procesar el pedido");
+    } catch {
+      // Error de red: revertir
+      setCart(snapshotCart);
+      if (snapshotOrderId) setCurrentOrderId(snapshotOrderId);
+      setOrderSuccess(false);
+      setOrderError("Error de conexión. Verifica el internet y reintenta.");
     }
   };
 
@@ -977,7 +1004,7 @@ const Pos: React.FC = () => {
             <Button
               type="button"
               variant="outline"
-              disabled={cart.length === 0 || orderSubmitting}
+              disabled={cart.length === 0}
               onClick={() => handlePlaceOrder("accepted")}
               className="text-xs border-border text-text hover:bg-bg-subtle flex items-center justify-center gap-1 px-2 py-2.5"
             >
@@ -986,9 +1013,8 @@ const Pos: React.FC = () => {
             </Button>
             <Button
               type="button"
-              disabled={cart.length === 0 || orderSubmitting}
+              disabled={cart.length === 0}
               onClick={() => handlePlaceOrder("completed")}
-              loading={orderSubmitting}
               className="text-xs bg-red-600 hover:bg-red-750 text-white flex items-center justify-center gap-1 border-0 px-2 py-2.5 shadow-md shadow-red-500/10 active:scale-95"
             >
               <CheckCircle className="w-3.5 h-3.5" />

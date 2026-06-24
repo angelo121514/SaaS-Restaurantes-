@@ -164,6 +164,8 @@ const Orders: React.FC = () => {
   const [paymentSubmitting, setPaymentSubmitting] = useState(false);
   const [statusFilter, setStatusFilter] = useState<string>("pending");
   const [selectedDate, setSelectedDate] = useState<string>(new Date().toLocaleDateString("en-CA"));
+  // Set de IDs de pedidos cuya acción está en vuelo — evita doble-click
+  const [processingIds, setProcessingIds] = useState<Set<string>>(new Set());
   // IDs de pedidos ya vistos (evita el stale closure sobre `orders`).
   const seenOrderIdsRef = useRef<Set<string>>(new Set());
   const firstLoadRef = useRef(true);
@@ -217,12 +219,16 @@ const Orders: React.FC = () => {
   const dayOrdersCount = completedDayOrders.length;
 
   const handleStatusUpdate = async (orderId: string, newStatus: string) => {
+    // Prevenir doble-click: ignorar si ya hay una acción en vuelo para este pedido
+    if (processingIds.has(orderId)) return;
+    setProcessingIds((prev) => new Set(prev).add(orderId));
+
     // Guardar copia del estado anterior para poder revertir si la API falla
     const previousOrders = [...orders];
 
     // Actualizar el estado local de forma optimista (instantáneo en pantalla)
     setOrders((prev) =>
-      prev.map((o) => (o.id === orderId ? { ...o, status: newStatus } : o))
+      prev.map((o) => (o.id === orderId ? ({ ...o, status: newStatus as Order["status"] } as Order) : o))
     );
 
     const success = await updateOrderStatus(orderId, newStatus);
@@ -231,6 +237,13 @@ const Orders: React.FC = () => {
       setOrders(previousOrders);
       alert("Error al actualizar el estado del pedido. El cambio fue revertido.");
     }
+
+    // Liberar el ID una vez que la acción termina (éxito o error)
+    setProcessingIds((prev) => {
+      const next = new Set(prev);
+      next.delete(orderId);
+      return next;
+    });
   };
 
   const handleConfirmPayment = async () => {
@@ -246,13 +259,13 @@ const Orders: React.FC = () => {
     setOrders((prev) =>
       prev.map((o) =>
         o.id === orderId
-          ? {
+          ? ({
               ...o,
-              status: "completed",
+              status: "completed" as Order["status"],
               payment_method: paymentMethod,
               payment_transaction_id: transactionId.trim() || undefined,
               payment_status: "paid",
-            }
+            } as Order)
           : o
       )
     );
@@ -528,6 +541,7 @@ const Orders: React.FC = () => {
                         variant="secondary"
                         size="sm"
                         fullWidth
+                        disabled={processingIds.has(order.id)}
                         onClick={() => handleStatusUpdate(order.id, "accepted")}
                       >
                         Aceptar
@@ -536,6 +550,7 @@ const Orders: React.FC = () => {
                         variant="outline"
                         size="sm"
                         fullWidth
+                        disabled={processingIds.has(order.id)}
                         onClick={() => {
                           setSelectedOrder(order);
                           setShowRejectModal(true);
@@ -553,6 +568,7 @@ const Orders: React.FC = () => {
                           variant="secondary"
                           size="sm"
                           fullWidth
+                          disabled={processingIds.has(order.id)}
                           onClick={() => handleStatusUpdate(order.id, "completed")}
                           className="!bg-emerald-600 hover:!bg-emerald-700 text-white font-bold border-0"
                         >
@@ -577,6 +593,7 @@ const Orders: React.FC = () => {
                         variant="outline"
                         size="sm"
                         fullWidth
+                        disabled={processingIds.has(order.id)}
                         onClick={() => {
                           setSelectedOrder(order);
                           setShowRejectModal(true);
