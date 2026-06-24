@@ -219,30 +219,15 @@ export const CURRENT_POLICY_VERSION = "2026-06-01";
 /** Email de contacto del DPO (placeholder editable). */
 export const DPO_EMAIL = "dpo@cmorflow.cl";
 
-// Export either real or mock Supabase client
-const isMockMode =
-  !SUPABASE_URL ||
-  SUPABASE_URL === "YOUR_SUPABASE_URL" ||
-  !SUPABASE_ANON_KEY ||
-  SUPABASE_ANON_KEY === "YOUR_SUPABASE_ANON_KEY";
+// Export real Supabase client (Mock mode is completely disabled)
+const isMockMode = false;
 
-if (isMockMode) {
-  console.warn("⚠️ Supabase credentials not found or set to placeholder. Running in LOCAL MOCK MODE (data will persist in localStorage).");
-}
-
-let activeClient: any;
-if (isMockMode) {
-  // Dynamic import isolates the mock code in a separate chunk, keeping it out of the main production bundle
-  const { MockSupabaseClient } = await import("./mockSupabase");
-  activeClient = new MockSupabaseClient() as any;
-} else {
-  activeClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
-    auth: {
-      autoRefreshToken: true,
-      persistSession: true,
-      detectSessionInUrl: true,
-    },
-  });
-}
+const activeClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+  auth: {
+    autoRefreshToken: true,
+    persistSession: true,
+    detectSessionInUrl: true,
+  },
+});
 
 export const supabase = activeClient;
