@@ -258,15 +258,43 @@ export const copyToClipboard = async (text: string): Promise<boolean> => {
 
 /**
  * Play notification sound
+ * Uses native Web Audio API to synthesize a high-fidelity, clean chime sound (ding-dong)
+ * self-contained, high-performance, bypassing browser media file limitations.
  */
 export const playNotificationSound = () => {
-  const audio = new Audio(
-    "data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBj+a2/LDciUFLIHO8tiJNwgZaLvt559NEAxQp+PwtmMcBjiR1/LMeSwFJHfH8N2QQAoUXrTp66hVFApGn+DyvmwhBjaP1fPTgjMGHm7A7+OZSA0OVaztl"
-  );
-  audio.volume = 0.3;
-  audio.play().catch(() => {
-    // Ignore if autoplay is blocked
-  });
+  try {
+    const AudioContext = window.AudioContext || (window as any).webkitAudioContext;
+    if (!AudioContext) return;
+    const ctx = new AudioContext();
+    
+    // Helper to play a single bell/chime tone with attack and exponential decay
+    const playTone = (startTime: number, frequency: number, duration: number, volume: number) => {
+      const osc = ctx.createOscillator();
+      const gainNode = ctx.createGain();
+      
+      osc.type = "sine";
+      osc.frequency.setValueAtTime(frequency, startTime);
+      
+      // Clean chime volume envelope
+      gainNode.gain.setValueAtTime(0, startTime);
+      gainNode.gain.linearRampToValueAtTime(volume, startTime + 0.02); // Quick attack
+      gainNode.gain.exponentialRampToValueAtTime(0.001, startTime + duration); // Smooth decay
+      
+      osc.connect(gainNode);
+      gainNode.connect(ctx.destination);
+      
+      osc.start(startTime);
+      osc.stop(startTime + duration);
+    };
+    
+    const now = ctx.currentTime;
+    // Tone 1 ("Ding"): D5 (587.33 Hz) played immediately
+    playTone(now, 587.33, 0.5, 0.25);
+    // Tone 2 ("Dong"): A5 (880.00 Hz) played slightly delayed
+    playTone(now + 0.12, 880.00, 0.7, 0.20);
+  } catch (e) {
+    console.warn("Audio playback blocked by autoplay policy or unsupported:", e);
+  }
 };
 
 /**
