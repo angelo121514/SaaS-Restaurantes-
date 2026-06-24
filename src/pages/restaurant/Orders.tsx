@@ -205,7 +205,11 @@ const Orders: React.FC = () => {
 
   const handleStatusUpdate = async (orderId: string, newStatus: string) => {
     const success = await updateOrderStatus(orderId, newStatus);
-    if (!success) {
+    if (success) {
+      setOrders((prev) =>
+        prev.map((o) => (o.id === orderId ? { ...o, status: newStatus } : o))
+      );
+    } else {
       alert("Error al actualizar el estado del pedido");
     }
   };
@@ -219,6 +223,19 @@ const Orders: React.FC = () => {
     });
     setPaymentSubmitting(false);
     if (success) {
+      setOrders((prev) =>
+        prev.map((o) =>
+          o.id === selectedOrder.id
+            ? {
+                ...o,
+                status: "completed",
+                payment_method: paymentMethod,
+                payment_transaction_id: transactionId.trim() || undefined,
+                payment_status: "paid",
+              }
+            : o
+        )
+      );
       setShowPaymentModal(false);
       setSelectedOrder(null);
     } else {
