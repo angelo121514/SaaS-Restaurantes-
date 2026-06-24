@@ -163,6 +163,7 @@ const Orders: React.FC = () => {
   const [transactionId, setTransactionId] = useState("");
   const [paymentSubmitting, setPaymentSubmitting] = useState(false);
   const [statusFilter, setStatusFilter] = useState<string>("pending");
+  const [selectedDate, setSelectedDate] = useState<string>(new Date().toLocaleDateString("en-CA"));
   // IDs de pedidos ya vistos (evita el stale closure sobre `orders`).
   const seenOrderIdsRef = useRef<Set<string>>(new Set());
   const firstLoadRef = useRef(true);
@@ -195,13 +196,25 @@ const Orders: React.FC = () => {
   }, [restaurantId]);
 
   const filteredOrders = orders
-    .filter((order) => order.status === statusFilter)
+    .filter((order) => {
+      const orderLocalDate = new Date(order.created_at).toLocaleDateString("en-CA");
+      return order.status === statusFilter && orderLocalDate === selectedDate;
+    })
     .sort((a, b) => {
       // Oldest first (FIFO)
       return (
         new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
       );
     });
+
+  // Calcular ventas totales (solo completados) del día seleccionado
+  const dayOrders = orders.filter(
+    (order) => new Date(order.created_at).toLocaleDateString("en-CA") === selectedDate
+  );
+  
+  const completedDayOrders = dayOrders.filter((order) => order.status === "completed");
+  const dayTotalSales = completedDayOrders.reduce((sum, order) => sum + (order.total || 0), 0);
+  const dayOrdersCount = completedDayOrders.length;
 
   const handleStatusUpdate = async (orderId: string, newStatus: string) => {
     // Guardar copia del estado anterior para poder revertir si la API falla
@@ -324,6 +337,31 @@ const Orders: React.FC = () => {
       <div className="flex items-center space-x-2 text-sm text-success">
         <div className="w-2 h-2 bg-success rounded-full animate-pulse" />
         <span>Actualizaciones en vivo • Alertas sonoras habilitadas</span>
+      </div>
+
+      {/* Date Filter & Day Sales Summary Banner */}
+      <div className="flex flex-col md:flex-row gap-4 items-stretch md:items-center justify-between bg-white p-4 rounded-xl border border-border">
+        <div className="flex items-center gap-3">
+          <label htmlFor="order-date-filter" className="text-sm font-bold text-text-secondary uppercase tracking-wider">
+            Filtrar por Día:
+          </label>
+          <input
+            id="order-date-filter"
+            type="date"
+            value={selectedDate}
+            onChange={(e) => setSelectedDate(e.target.value)}
+            className="bg-bg border border-border rounded-lg px-3 py-1.5 font-bold text-text text-sm focus:outline-none focus:ring-1 focus:ring-accent"
+          />
+        </div>
+        <div className="flex items-center gap-3 bg-success/5 border border-success/20 px-4 py-2 rounded-lg">
+          <span className="text-xs font-bold text-success uppercase tracking-wider">Ventas del Día (Completados):</span>
+          <span className="text-lg font-black text-success">
+            {formatCurrency(dayTotalSales, restaurant?.currency || "CLP", restaurant?.usd_exchange_rate || 950)}
+          </span>
+          <span className="text-xs text-text-secondary font-medium">
+            ({dayOrdersCount} pedido{dayOrdersCount !== 1 ? "s" : ""})
+          </span>
+        </div>
       </div>
 
       {/* Status Filter */}

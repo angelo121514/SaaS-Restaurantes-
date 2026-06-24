@@ -31,6 +31,9 @@ interface ReportData {
   totalRevenue: number;
   totalOrders: number;
   avgOrderValue: number;
+  totalSubtotal: number;
+  totalTax: number;
+  totalDiscount: number;
   topItems: { name: string; count: number; revenue: number }[];
   dailyRevenue: { date: string; revenue: number; orders: number }[];
   orderTypeDistribution: { type: string; count: number }[];
@@ -38,7 +41,7 @@ interface ReportData {
 
 const Reports: React.FC = () => {
   const restaurantId = useRestaurantId();
-  const [dateRange, setDateRange] = useState<"7" | "30" | "90">("30");
+  const [dateRange, setDateRange] = useState<"1" | "7" | "30" | "90">("30");
   const [loading, setLoading] = useState(true);
   const [reportData, setReportData] = useState<ReportData | null>(null);
 
@@ -52,7 +55,12 @@ const Reports: React.FC = () => {
       if (!restaurantId) return;
 
       const startDate = new Date();
-      startDate.setDate(startDate.getDate() - parseInt(dateRange));
+      if (dateRange === "1") {
+        startDate.setHours(0, 0, 0, 0); // Start of today in local time
+      } else {
+        startDate.setHours(0, 0, 0, 0);
+        startDate.setDate(startDate.getDate() - parseInt(dateRange) + 1);
+      }
 
       const { data: orders, error } = await supabase
         .from("orders")
@@ -65,7 +73,23 @@ const Reports: React.FC = () => {
 
       // Calculate metrics
       const totalRevenue =
-        orders?.reduce((sum: number, order: any) => sum + (order.total || order.total_amount || 0), 0) || 0;
+        orders?.reduce((sum: number, order: any) => sum + (order.total || 0), 0) || 0;
+      
+      const totalSubtotal =
+        orders?.reduce((sum: number, order: any) => {
+          const sub = order.subtotal || (order.total ? order.total / 1.19 : 0);
+          return sum + sub;
+        }, 0) || 0;
+      
+      const totalTax =
+        orders?.reduce((sum: number, order: any) => {
+          const tx = order.tax || (order.total ? order.total - (order.total / 1.19) : 0);
+          return sum + tx;
+        }, 0) || 0;
+      
+      const totalDiscount =
+        orders?.reduce((sum: number, order: any) => sum + (order.discount || 0), 0) || 0;
+
       const totalOrders = orders?.length || 0;
       const avgOrderValue = totalOrders > 0 ? totalRevenue / totalOrders : 0;
 
@@ -119,6 +143,9 @@ const Reports: React.FC = () => {
         totalRevenue,
         totalOrders,
         avgOrderValue,
+        totalSubtotal,
+        totalTax,
+        totalDiscount,
         topItems,
         dailyRevenue,
         orderTypeDistribution,
@@ -135,7 +162,10 @@ const Reports: React.FC = () => {
 
     const csvContent = [
       ["Métrica", "Valor"],
-      ["Ventas Totales", formatCurrency(reportData.totalRevenue)],
+      ["Ventas Netas (Neto)", formatCurrency(reportData.totalSubtotal)],
+      ["IVA Recaudado (19%)", formatCurrency(reportData.totalTax)],
+      ["Descuentos Aplicados", formatCurrency(reportData.totalDiscount)],
+      ["Ventas Brutas (Total)", formatCurrency(reportData.totalRevenue)],
       ["Pedidos Totales", reportData.totalOrders.toString()],
       ["Ticket Promedio", formatCurrency(reportData.avgOrderValue)],
       [""],
@@ -184,12 +214,13 @@ const Reports: React.FC = () => {
         <div className="flex gap-3">
           <select
             value={dateRange}
-            onChange={(e) => setDateRange(e.target.value as "7" | "30" | "90")}
+            onChange={(e) => setDateRange(e.target.value as "1" | "7" | "30" | "90")}
             className="input rounded-lg border-border bg-white px-3 text-sm focus:outline-none"
           >
-            <option value="7">Últimos 7 Días</option>
-            <option value="30">Últimos 30 Días</option>
-            <option value="90">Últimos 90 Días</option>
+            <option value="1">Hoy</option>
+            <option value="7">Últimos 7 Días (Semana)</option>
+            <option value="30">Últimos 30 Días (Mes)</option>
+            <option value="90">Últimos 90 Días (3 Meses)</option>
           </select>
           <Button
             icon={<Download className="w-5 h-5" />}
@@ -252,6 +283,57 @@ const Reports: React.FC = () => {
           <p className="text-text-secondary text-sm">Período de Reporte</p>
         </Card>
       </div>
+
+      {/* Detailed Financial Breakdown Card */}
+      <Card className="!p-6">
+        <h3 className="text-lg font-bold text-text mb-4 flex items-center gap-2">
+          <TrendingUp className="w-5 h-5 text-accent" />
+          Resumen Financiero Detallado (Desglose de IVA)
+        </h3>
+        <div className="overflow-x-auto">
+          <table className="w-full text-left border-collapse">
+            <thead>
+              <tr className="border-b border-border text-xs font-bold text-text-secondary uppercase tracking-wider">
+                <th className="py-3">Concepto</th>
+                <th className="py-3 text-right">Monto</th>
+                <th className="py-3 text-right">Porcentaje / Detalle</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-border text-sm">
+              <tr>
+                <td className="py-3.5 font-medium text-text">Ventas Netas (Base Imponible)</td>
+                <td className="py-3.5 text-right font-bold text-text">
+                  {formatCurrency(reportData.totalSubtotal)}
+                </td>
+                <td className="py-3.5 text-right text-text-secondary text-xs">Neto sin impuestos</td>
+              </tr>
+              <tr>
+                <td className="py-3.5 font-medium text-text">IVA Recaudado (19%)</td>
+                <td className="py-3.5 text-right font-bold text-accent-secondary">
+                  {formatCurrency(reportData.totalTax)}
+                </td>
+                <td className="py-3.5 text-right text-text-secondary text-xs">Impuesto al valor agregado</td>
+              </tr>
+              {reportData.totalDiscount > 0 && (
+                <tr>
+                  <td className="py-3.5 font-medium text-success">Descuentos Aplicados</td>
+                  <td className="py-3.5 text-right font-bold text-success">
+                    -{formatCurrency(reportData.totalDiscount)}
+                  </td>
+                  <td className="py-3.5 text-right text-success text-xs">Rebajas y promociones</td>
+                </tr>
+              )}
+              <tr className="bg-bg-subtle font-bold text-base">
+                <td className="py-4 text-text pl-3 rounded-l-lg">Ventas Brutas (Total Facturado)</td>
+                <td className="py-4 text-right text-success font-black">
+                  {formatCurrency(reportData.totalRevenue)}
+                </td>
+                <td className="py-4 text-right text-text-secondary text-xs pr-3 rounded-r-lg">Monto final recaudado (con IVA)</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </Card>
 
       {/* Charts */}
       <div className="grid lg:grid-cols-2 gap-6">
