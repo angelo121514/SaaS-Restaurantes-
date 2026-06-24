@@ -37,10 +37,8 @@ BEGIN
   --    se borrarán automáticamente gracias al ON DELETE CASCADE.
   DELETE FROM public.restaurants WHERE id = p_restaurant_id;
 
-  -- 5. Registrar en el log de auditoría
-  INSERT INTO public.audit_log (actor_id, action, target_type, target_id, before, after)
-  VALUES (
-    auth.uid(),
+  -- 5. Registrar en el log de auditoría usando el helper oficial del proyecto
+  PERFORM public.log_admin_action(
     'delete_restaurant',
     'restaurant',
     p_restaurant_id,
