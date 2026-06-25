@@ -66,10 +66,6 @@ const RegisterPage: React.FC = () => {
   // Payment states
   const [selectedPlan, setSelectedPlan] = useState<"free_trial" | "starter" | "pro">("pro");
   const [paymentLoading, setPaymentLoading] = useState(false);
-  const [cardNumber, setCardNumber] = useState("");
-  const [cardName, setCardName] = useState("");
-  const [cardExpiry, setCardExpiry] = useState("");
-  const [cardCvv, setCardCvv] = useState("");
   const [paymentError, setPaymentError] = useState("");
 
 
@@ -228,85 +224,97 @@ const RegisterPage: React.FC = () => {
   const handlePaymentSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setPaymentError("");
-
-    if (selectedPlan !== "free_trial") {
-      if (!cardNumber || !cardName || !cardExpiry || !cardCvv) {
-        setPaymentError("Por favor completa todos los campos de pago");
-        return;
-      }
-      if (cardNumber.replace(/\s/g, "").length < 16) {
-        setPaymentError("Número de tarjeta inválido");
-        return;
-      }
-    }
-
     setPaymentLoading(true);
 
-    // P0-2 Remediación: el flujo de pago real se implementará en P1-7.
-    // Por ahora, solo free_trial se auto-activa; starter/pro requieren
-    // que el webhook de la gateway llame a auto_approve_registration_v2.
-    // (La RPC rechaza planes pagos si no es admin o webhook autenticado.)
     try {
-      const planConfig = APP_CONFIG.plans[selectedPlan as keyof typeof APP_CONFIG.plans];
-      const amount = planConfig ? planConfig.price : 0;
-      const provider = "trial"; // solo trial se auto-activa
-      const txId = "trial_" + Math.random().toString(36).substring(2, 11);
+      if (selectedPlan === "free_trial") {
+        // Flujo Free Trial: se auto-activa mediante la RPC
+        const planConfig = APP_CONFIG.plans[selectedPlan as keyof typeof APP_CONFIG.plans];
+        const amount = planConfig ? planConfig.price : 0;
+        const provider = "trial";
+        const txId = "trial_" + Math.random().toString(36).substring(2, 11);
 
-      // Call our secure RPC that automatically approves, activates and links profiles
-      const { data, error: rpcErr } = await supabase.rpc("auto_approve_registration_v2", {
-        p_request_id: createdRequestId,
-        p_plan: selectedPlan,
-        p_payment_provider: provider,
-        p_transaction_id: txId,
-        p_amount: amount,
-      });
+        // Llamar a nuestra RPC segura para aprobar y activar
+        const { data, error: rpcErr } = await supabase.rpc("auto_approve_registration_v2", {
+          p_request_id: createdRequestId,
+          p_plan: selectedPlan,
+          p_payment_provider: provider,
+          p_transaction_id: txId,
+          p_amount: amount,
+        });
 
-      if (rpcErr) throw rpcErr;
+        if (rpcErr) throw rpcErr;
 
-      if (data && data.length > 0 && !data[0].success) {
-        // P0-2: si la RPC rechaza por plan pago no autorizado, redirigir a flujo de pago
-        if (data[0].error === "unauthorized_paid_plan") {
-          throw new Error(
-            "Para activar el plan " + selectedPlan + " debes completar el pago. " +
-            "El flujo de pago real será implementado próximamente. " +
-            "Por ahora, regístrate con plan Free Trial y contacta a ventas@cmorflow.cl para upgrade."
-          );
+        if (data && data.length > 0 && !data[0].success) {
+          throw new Error(data[0].message || data[0].error || "Error al activar el restaurante");
         }
-        throw new Error(data[0].message || data[0].error || "Error al activar el restaurante");
-      }
 
-      const createdRestaurantId = data[0].restaurant_id;
+        const createdRestaurantId = data[0].restaurant_id;
 
-      // Register user in Supabase Auth with metadata linking to restaurant
-      const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
-        email: formData.email.toLowerCase(),
-        password: userPassword,
-        options: {
-          data: {
-            full_name: formData.owner_name,
-            role: "owner",
-            restaurant_id: createdRestaurantId,
+        // Registrar usuario en Supabase Auth
+        const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
+          email: formData.email.toLowerCase(),
+          password: userPassword,
+          options: {
+            data: {
+              full_name: formData.owner_name,
+              role: "owner",
+              restaurant_id: createdRestaurantId,
+            },
           },
-        },
-      });
+        });
 
-      if (signUpError) {
-        // If user already exists (retry scenario), don't break the flow
-        if (!signUpError.message.toLowerCase().includes("already registered")) {
-          throw new Error(`Error al registrar credenciales: ${signUpError.message}`);
+        if (signUpError) {
+          if (!signUpError.message.toLowerCase().includes("already registered")) {
+            throw new Error(`Error al registrar credenciales: ${signUpError.message}`);
+          }
         }
-      }
 
-      // If user chose Email and it is not mock mode, invoke the invitation trigger
-      if (formData.delivery_channel === "email" && typeof (supabase as any).auth?.onAuthStateChange === "function") {
-        try {
-          await supabase.functions.invoke("invite-owner");
-        } catch (funcErr) {
-          console.error("Error al disparar Edge Function de invitaciones:", funcErr);
+        // Si eligió Email y no es modo mock, disparar invitación
+        if (formData.delivery_channel === "email" && typeof (supabase as any).auth?.onAuthStateChange === "function") {
+          try {
+            await supabase.functions.invoke("invite-owner");
+          } catch (funcErr) {
+            console.error("Error al disparar Edge Function de invitaciones:", funcErr);
+          }
         }
-      }
 
-      setStep("success");
+        setStep("success");
+      } else {
+        // Flujo Plan Pago (Starter/Pro): Integración con Transbank Webpay Plus
+        console.log("Iniciando pago con Webpay para el plan:", selectedPlan);
+        const { data, error: funcError } = await supabase.functions.invoke("create-payment-intent", {
+          body: {
+            registration_request_id: createdRequestId,
+            plan: selectedPlan,
+          },
+        });
+
+        if (funcError) {
+          console.error("Error al invocar create-payment-intent:", funcError);
+          throw new Error("No se pudo iniciar la transacción de pago con Webpay. Por favor, intenta de nuevo.");
+        }
+
+        if (!data || !data.success) {
+          console.error("Respuesta fallida de create-payment-intent:", data);
+          throw new Error(data?.error || "Error al generar la transacción con Webpay.");
+        }
+
+        // Redirigir al portal de Transbank Webpay de forma segura vía POST
+        console.log("Redirigiendo a Webpay:", data.url);
+        const form = document.createElement("form");
+        form.method = "POST";
+        form.action = data.url;
+
+        const tokenInput = document.createElement("input");
+        tokenInput.type = "hidden";
+        tokenInput.name = "token_ws";
+        tokenInput.value = data.token;
+
+        form.appendChild(tokenInput);
+        document.body.appendChild(form);
+        form.submit();
+      }
     } catch (err: any) {
       console.error("Payment error:", err);
       setPaymentError(err.message || "Error al procesar el pago. Por favor intenta de nuevo.");
@@ -325,22 +333,6 @@ const RegisterPage: React.FC = () => {
     if (errors[name as keyof FormData]) {
       setErrors((prev) => ({ ...prev, [name]: "" }));
     }
-  };
-
-  // Card formatting helpers
-  const handleCardNumberChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const val = e.target.value.replace(/\D/g, "");
-    const formatted = val.replace(/(\d{4})(?=\d)/g, "$1 ").substring(0, 19);
-    setCardNumber(formatted);
-  };
-
-  const handleExpiryChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const val = e.target.value.replace(/\D/g, "");
-    let formatted = val;
-    if (val.length > 2) {
-      formatted = `${val.substring(0, 2)}/${val.substring(2, 4)}`;
-    }
-    setCardExpiry(formatted.substring(0, 5));
   };
 
   // ==========================================
@@ -516,7 +508,7 @@ const RegisterPage: React.FC = () => {
                 <h3 className="font-bold text-lg text-text">Demo 15 Días</h3>
                 <p className="text-xs text-text-secondary mt-1">Prueba gratis inicial</p>
                 <div className="my-4">
-                  <span className="text-2xl font-black text-text">$0</span>
+                  <span className="text-2xl font-black text-text">${APP_CONFIG.plans.free_trial.price.toLocaleString("es-CL")}</span>
                   <span className="text-xs text-text-secondary font-medium"> / mes</span>
                 </div>
                 <ul className="text-xs text-text-secondary space-y-2 border-t border-border/50 pt-3">
@@ -544,7 +536,7 @@ const RegisterPage: React.FC = () => {
                 <h3 className="font-bold text-lg text-text">Starter</h3>
                 <p className="text-xs text-text-secondary mt-1">Esencial para locales</p>
                 <div className="my-4">
-                  <span className="text-2xl font-black text-text">$40.000</span>
+                  <span className="text-2xl font-black text-text">${APP_CONFIG.plans.starter.price.toLocaleString("es-CL")}</span>
                   <span className="text-xs text-text-secondary font-medium"> / mes</span>
                 </div>
                 <ul className="text-xs text-text-secondary space-y-2 border-t border-border/50 pt-3">
@@ -578,7 +570,7 @@ const RegisterPage: React.FC = () => {
                 </h3>
                 <p className="text-xs text-text-secondary mt-1">Multi-sucursal e IA</p>
                 <div className="my-4">
-                  <span className="text-2xl font-black text-text">$120.000</span>
+                  <span className="text-2xl font-black text-text">${APP_CONFIG.plans.pro.price.toLocaleString("es-CL")}</span>
                   <span className="text-xs text-text-secondary font-medium"> / mes</span>
                 </div>
                 <ul className="text-xs text-text-secondary space-y-2 border-t border-border/50 pt-3">
@@ -668,19 +660,19 @@ const RegisterPage: React.FC = () => {
                       size="lg"
                       className="bg-red-600 hover:bg-red-700 text-white font-bold transition-all border-0 shadow-lg"
                     >
-                      Pagar (Simular Éxito)
+                      Pagar con Webpay Plus
                     </Button>
                     <Button
                       type="button"
                       onClick={() => {
-                        setPaymentError("Transacción rechazada por el usuario en el portal de Webpay.");
+                        setStep("form");
                       }}
                       variant="outline"
                       fullWidth
                       size="lg"
                       className="border-border hover:bg-bg-subtle text-text"
                     >
-                      Cancelar Transacción
+                      Volver / Cambiar Plan
                     </Button>
                   </div>
                 </div>

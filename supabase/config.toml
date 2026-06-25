@@ -81,3 +81,9 @@ verify_jwt = false
 
 [functions.invite-owner]
 verify_jwt = false
+
+[functions.create-payment-intent]
+verify_jwt = false
+
+[functions.webhooks]
+verify_jwt = false

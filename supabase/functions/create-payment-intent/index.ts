@@ -29,7 +29,7 @@ const WEBPAY_API_URL = Deno.env.get("WEBPAY_ENVIRONMENT") === "production"
   : "https://webpay3gint.transbank.cl";
 
 const WEBPAY_COMMERCE_CODE = Deno.env.get("WEBPAY_COMMERCE_CODE") || "597055555532"; // código integración
-const WEBPAY_API_KEY = Deno.env.get("WEBPAY_API_KEY") || "579B516A3B7D4A2E1B6F8C9D0E1F2A3B4C5D6E7F8A9B0C1D2E3F4A5B6C7D8E9F0";
+const WEBPAY_API_KEY = Deno.env.get("WEBPAY_API_KEY") || "579B532A7440BB0C9079DED94D31EA1615BACEB56610332264630D42D0A36B1C";
 
 const PUBLIC_APP_URL = Deno.env.get("PUBLIC_APP_URL") || "https://app.cmorflow.cl";
 
@@ -39,7 +39,7 @@ interface PlanConfig {
 }
 
 const PLANS: Record<string, PlanConfig> = {
-  starter: { amount: 9900, name: "Plan Starter (mensual)" },
+  starter: { amount: 50, name: "Plan Starter (Prueba $50)" },
   pro: { amount: 24900, name: "Plan Pro (mensual)" },
 };
 
@@ -56,14 +56,14 @@ Deno.serve(async (req) => {
       return jsonResponse(req, {
         success: false,
         error: "registration_request_id y plan son requeridos",
-      }, 400);
+      }, 200);
     }
 
     if (!PLANS[plan]) {
       return jsonResponse(req, {
         success: false,
         error: "plan inválido. Valores: starter, pro",
-      }, 400);
+      }, 200);
     }
 
     // Para free_trial, no se requiere pago
@@ -71,7 +71,7 @@ Deno.serve(async (req) => {
       return jsonResponse(req, {
         success: false,
         error: "free_trial no requiere pago. Usa auto_approve_registration_v2 directamente.",
-      }, 400);
+      }, 200);
     }
 
     // 1. Verificar que el registration_request existe y está pendiente
@@ -86,18 +86,21 @@ Deno.serve(async (req) => {
       return jsonResponse(req, {
         success: false,
         error: "registration_request no encontrada o ya procesada",
-      }, 404);
+      }, 200);
     }
 
-    // 2. Generar buy_order único
-    const buyOrder = `CMOR-${registrationRequestId.slice(0, 8)}-${Date.now()}`;
+    // 2. Generar buy_order único (máximo 26 caracteres para Transbank)
+    const buyOrder = `C-${registrationRequestId.slice(0, 6)}-${Date.now().toString().slice(-10)}`;
     const sessionId = `session-${registrationRequestId}`;
     const amount = PLANS[plan].amount;
-    const returnUrl = `${PUBLIC_APP_URL}/payment/callback`;
+    // Si la URL de Supabase es la interna de Docker (kong), usamos localhost:54321 expuesto
+    const returnUrl = SUPABASE_URL.includes("kong")
+      ? `http://localhost:54321/functions/v1/webhooks/webpay`
+      : `${SUPABASE_URL}/functions/v1/webhooks/webpay`;
 
     // 3. Llamar a Webpay para crear transacción
     const webpayResponse = await fetch(
-      `${WEBPAY_API_URL}/rswebpay/transactions/api/webpay/v1.2/transactions`,
+      `${WEBPAY_API_URL}/rswebpaytransaction/api/webpay/v1.2/transactions`,
       {
         method: "POST",
         headers: {
@@ -121,7 +124,7 @@ Deno.serve(async (req) => {
         success: false,
         error: "webpay_api_error",
         details: errText,
-      }, 502);
+      }, 200);
     }
 
     const webpayData = await webpayResponse.json();

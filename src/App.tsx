@@ -11,6 +11,7 @@ import RequireRole from "./components/RequireRole";
 const RegisterPage = lazy(() => import("./pages/public/RegisterPage"));
 const LoginPage = lazy(() => import("./pages/public/LoginPage"));
 const SetupPassword = lazy(() => import("./pages/public/SetupPassword"));
+const PaymentErrorPage = lazy(() => import("./pages/public/PaymentErrorPage"));
 
 const RestaurantDashboard = lazy(() => import("./pages/restaurant/Dashboard"));
 const AdminLogin = lazy(() => import("./pages/admin/LoginPage"));
@@ -47,6 +48,7 @@ function App() {
           <Route path="/register" element={<RegisterPage />} />
           <Route path="/login" element={<LoginPage />} />
           <Route path="/setup-password" element={<SetupPassword />} />
+          <Route path="/payment/error" element={<PaymentErrorPage />} />
 
           {/* Legal / Privacy (publicas) */}
           <Route path="/legal/privacidad" element={<PublicPrivacy />} />

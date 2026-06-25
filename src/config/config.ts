@@ -33,10 +33,10 @@ export const APP_CONFIG = {
     },
     starter: {
       name: "Básico (Starter)",
-      price: 40000,
+      price: 50,
       price_usd: 45,
-      price_annual: 408000, // 40.000 * 12 * 0.85 (15% ahorro)
-      price_annual_usd: 459, // 45 * 12 * 0.85 (15% ahorro)
+      price_annual: 510, // Coherente con la prueba
+      price_annual_usd: 459,
       duration: "por mes",
       features: [
         "Pedidos ilimitados",
