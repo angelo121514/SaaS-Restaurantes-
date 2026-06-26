@@ -6,6 +6,8 @@
 
 export const ALLOWED_ORIGINS = [
   "https://app.cmorflow.cl",
+  "https://cmorflowqr.com",
+  "https://www.cmorflowqr.com",
   "https://cmor-flow.vercel.app",
   "https://cmor-flow-staging.vercel.app",
   "http://localhost:5173",
