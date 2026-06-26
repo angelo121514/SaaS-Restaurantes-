@@ -66,6 +66,8 @@ const PaymentErrorPage: React.FC = () => {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const reason = searchParams.get("reason") || "";
+  const buyOrder = searchParams.get("buy_order") || "";
+  const amount = searchParams.get("amount") || "";
   
   const errorDetails = ERROR_MAPPING[reason] || DEFAULT_ERROR;
 
@@ -102,11 +104,28 @@ const PaymentErrorPage: React.FC = () => {
         </div>
 
         <div className="bg-bg border border-border rounded-2xl p-5 mb-8 text-sm leading-relaxed text-text-secondary text-left">
-          {errorDetails.description}
-          {reason && (
-            <div className="mt-3 pt-3 border-t border-border flex items-center justify-between text-[11px] font-mono">
-              <span>Código de estado:</span>
-              <span className="bg-bg px-2 py-0.5 border border-border rounded text-text font-bold uppercase">{reason}</span>
+          <p className="mb-3">{errorDetails.description}</p>
+          
+          {(buyOrder || amount || reason) && (
+            <div className="mt-3 pt-3 border-t border-border space-y-2 text-xs font-mono">
+              {buyOrder && (
+                <div className="flex justify-between">
+                  <span className="text-text-secondary">Orden de Compra:</span>
+                  <span className="text-text font-bold">{buyOrder}</span>
+                </div>
+              )}
+              {amount && (
+                <div className="flex justify-between">
+                  <span className="text-text-secondary">Monto:</span>
+                  <span className="text-text font-bold">${Number(amount).toLocaleString("es-CL")} CLP</span>
+                </div>
+              )}
+              <div className="flex justify-between">
+                <span className="text-text-secondary">Resultado / Motivo:</span>
+                <span className="bg-bg-subtle px-2 py-0.5 border border-border rounded text-text font-bold uppercase">
+                  {reason === "user_cancelled" ? "ANULADA_POR_USUARIO" : (reason || "RECHAZADA")}
+                </span>
+              </div>
             </div>
           )}
         </div>

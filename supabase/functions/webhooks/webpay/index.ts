@@ -81,7 +81,7 @@ export async function handler(req: Request): Promise<Response> {
         })
         .eq("id", paymentIntent.id);
 
-      return Response.redirect(`${PUBLIC_APP_URL}/payment/error?reason=user_cancelled`);
+      return Response.redirect(`${PUBLIC_APP_URL}/payment/error?reason=user_cancelled&buy_order=${encodeURIComponent(paymentIntent.buy_order || "")}&amount=${paymentIntent.amount || ""}`);
     }
 
     // Caso: Transacción completada (tenemos token_ws), procedemos a confirmar
@@ -118,7 +118,7 @@ export async function handler(req: Request): Promise<Response> {
           .eq("id", paymentIntent.id);
       }
 
-      return Response.redirect(`${PUBLIC_APP_URL}/payment/error?reason=confirm_failed`);
+      return Response.redirect(`${PUBLIC_APP_URL}/payment/error?reason=confirm_failed&buy_order=${encodeURIComponent(paymentIntent?.buy_order || "")}&amount=${paymentIntent?.amount || ""}`);
     }
 
     const transaction = await confirmResponse.json();
@@ -145,7 +145,7 @@ export async function handler(req: Request): Promise<Response> {
           .eq("id", paymentIntent.id);
       }
 
-      return Response.redirect(`${PUBLIC_APP_URL}/payment/error?reason=${transaction.status}`);
+      return Response.redirect(`${PUBLIC_APP_URL}/payment/error?reason=${transaction.status}&buy_order=${encodeURIComponent(transaction.buy_order)}&amount=${transaction.amount}`);
     }
 
     // 3. Buscar payment_intent por buy_order
@@ -157,13 +157,13 @@ export async function handler(req: Request): Promise<Response> {
 
     if (piError || !paymentIntent) {
       console.error("Payment intent not found for buy_order:", transaction.buy_order);
-      return Response.redirect(`${PUBLIC_APP_URL}/payment/error?reason=intent_not_found`);
+      return Response.redirect(`${PUBLIC_APP_URL}/payment/error?reason=intent_not_found&buy_order=${encodeURIComponent(transaction.buy_order)}&amount=${transaction.amount}`);
     }
 
     // 4. Validar que el monto coincida
     if (transaction.amount !== paymentIntent.amount) {
       console.error("Amount mismatch:", transaction.amount, "vs", paymentIntent.amount);
-      return Response.redirect(`${PUBLIC_APP_URL}/payment/error?reason=amount_mismatch`);
+      return Response.redirect(`${PUBLIC_APP_URL}/payment/error?reason=amount_mismatch&buy_order=${encodeURIComponent(transaction.buy_order)}&amount=${transaction.amount}`);
     }
 
     // 5. Actualizar payment_intent
@@ -189,19 +189,36 @@ export async function handler(req: Request): Promise<Response> {
 
     if (activateError) {
       console.error("Activate restaurant error:", activateError);
-      return Response.redirect(`${PUBLIC_APP_URL}/payment/error?reason=activate_failed`);
+      return Response.redirect(`${PUBLIC_APP_URL}/payment/error?reason=activate_failed&buy_order=${encodeURIComponent(transaction.buy_order)}&amount=${transaction.amount}`);
     }
 
     const result = Array.isArray(activateResult) ? activateResult[0] : activateResult;
     if (!result?.success) {
       console.error("Activate restaurant failed:", result);
-      return Response.redirect(`${PUBLIC_APP_URL}/payment/error?reason=activate_failed`);
+      return Response.redirect(`${PUBLIC_APP_URL}/payment/error?reason=activate_failed&buy_order=${encodeURIComponent(transaction.buy_order)}&amount=${transaction.amount}`);
     }
 
-    // 7. Redirigir al setup-password del nuevo owner
-    return Response.redirect(
-      `${PUBLIC_APP_URL}/setup-password?request_id=${paymentIntent.registration_request_id}&restaurant_id=${result.restaurant_id}`
-    );
+    // 6.5 Obtener datos de la solicitud de registro para el flujo de frontend
+    const { data: regRequest } = await supabase
+      .from("registration_requests")
+      .select("email, owner_name")
+      .eq("id", paymentIntent.registration_request_id)
+      .single();
+
+    // 7. Redirigir al setup-password del nuevo owner, incluyendo detalles de la transacción para las evidencias
+    const queryParams = new URLSearchParams({
+      request_id: paymentIntent.registration_request_id,
+      restaurant_id: String(result.restaurant_id),
+      email: regRequest?.email || "",
+      owner_name: regRequest?.owner_name || "",
+      buy_order: transaction.buy_order,
+      amount: String(transaction.amount),
+      authorization_code: transaction.authorization_code,
+      card_number: transaction.card_detail?.card_number || "",
+      transaction_date: transaction.transaction_date,
+      payment_type_code: transaction.payment_type_code,
+    });
+    return Response.redirect(`${PUBLIC_APP_URL}/setup-password?${queryParams.toString()}`);
   } catch (err) {
     console.error("webhook webpay error:", err);
     return Response.redirect(`${PUBLIC_APP_URL}/payment/error?reason=internal_error`);
